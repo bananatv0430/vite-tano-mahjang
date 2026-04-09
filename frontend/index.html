@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ja" class="no-js">
+  <head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-GP6LXC2BGT"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      var customPageLocation = location.protocol + '//' + location.host + location.pathname;
+      var cleanReferrer = '';
+      var referrer = document.referrer;
+      if (referrer) {
+        try {
+          var referrerUrl = new URL(document.referrer);
+          cleanReferrer = referrerUrl.origin + referrerUrl.pathname;
+        } catch (e) {}
+      }
+      gtag('config', 'G-GP6LXC2BGT', {
+        'page_title': document.title,
+        'page_path': location.pathname,
+        'page_location': customPageLocation,
+        'page_referrer': cleanReferrer
+      });
+    </script>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>T.LEAGUE（Tリーグ）公式サイト</title>
+
+    <!-- Google Fonts: Noto Sans -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    <link rel='stylesheet' id='wp-block-library-css' href='https://m-league.jp/wp/wp-includes/css/dist/block-library/style.min.css?ver=6.4.3' type='text/css' media='all' />
+    <link rel="stylesheet" href="/assets/css/global-styles-inline.css">
+    <link rel="icon" type="image/png" href="/assets/media/img/common/school_emblem.png" sizes="32x32">
+    <link rel="icon" type="image/png" href="/assets/media/img/common/school_emblem.png" sizes="48x48">
+    <link rel="icon" type="image/png" href="/assets/media/img/common/school_emblem.png" sizes="64x64">
+    <link rel="apple-touch-icon" href="/assets/media/img/common/school_emblem.png" sizes="64x64">
+    <link rel="stylesheet" href="/assets/css/main.bundle.css">
+    <link rel="stylesheet" href="/assets/css/vendor.bundle.css">
+
+    <script src="/assets/js/vendor.bundle.js"></script>
+    <script src="/assets/js/main.bundle.js"></script>
+    <!-- Twitter universal website tag code -->
+    <script>
+    !function(e,t,n,s,u,a){e.twq||(s=e.twq=function(){s.exe?s.exe.apply(s,arguments):s.queue.push(arguments);
+    },s.version='1.1',s.queue=[],u=t.createElement(n),u.async=!0,u.src='//static.ads-twitter.com/uwt.js',
+    a=t.getElementsByTagName(n)[0],a.parentNode.insertBefore(u,a))}(window,document,'script');
+    </script>
+    <!-- End Twitter universal website tag code -->
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

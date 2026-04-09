@@ -1,0 +1,728 @@
+@media (max-width: 600px) {
+  .tableWrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 100vw;
+  }
+  .scoreTableLow,
+  .scoreTableHigh {
+    font-size: 9px;
+    max-width: 100vw;
+    width: 100vw;
+    min-width: unset;
+    transform: scale(0.6);
+    transform-origin: top center;
+    margin: 0 auto;
+  }
+  .scoreTableLowTh,
+  .scoreTableLowTd,
+  .scoreTableHighTh,
+  .scoreTableHighTd,
+  .hanRange {
+    padding: 2px 1px;
+    min-width: 32px;
+    max-width: 40px;
+  }
+  .ronScore {
+    font-size: 12px;
+  }
+  .tsumoScore {
+    font-size: 9px;
+  }
+  .manganText {
+    font-size: 11px;
+  }
+}
+.toggleButtonDisabled {
+  background: #eee !important;
+  color: #aaa !important;
+  border: 2px solid #ccc !important;
+  cursor: default !important;
+  pointer-events: none;
+}
+/* ScoreTableページタイトル色上書き */
+.p-gamesSchedule__title,
+.p-gamesSchedule__desc {
+  color: #222 !important;
+}
+/* ==============================
+   トグルボタン
+   ============================== */
+.toggleButton {
+  background: #fff;
+  color: #118745;
+  border: 2px solid #118745;
+  border-radius: 9999px;
+  padding: 8px 32px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  margin: 0 4px;
+  transition: background 0.2s, color 0.2s, border 0.2s;
+}
+
+.toggleButtonActive {
+  background: #118745;
+  color: #fff;
+  border: 2px solid #118745;
+  border-radius: 9999px;
+  padding: 8px 32px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  margin: 0 4px;
+  transition: background 0.2s, color 0.2s, border 0.2s;
+}
+/* ==============================
+   全体レイアウト
+   ============================== */
+
+.tableContainer {
+  padding: 16px;
+  background-color: #ffffff;
+  display: flex;
+  flex-direction: column;
+
+  align-items: center;   /* ← 追加：横中央寄せ */
+  margin: 0 auto;        /* ← 念のため */
+  max-width: 1200px;
+  width: 100%;
+}
+
+/* 共通セクションスタイル */
+.scoreTableSection,
+.fuGuideSection {
+  overflow: hidden;
+  background-color: #fff;
+  padding: 20px;
+}
+
+.scoreTableSection {
+  margin: 40px 0px;
+}
+
+.fuGuideSection {
+  margin-top: 40px;
+  border-radius: 12px;
+  overflow: hidden;
+  background-color: #fff;
+  padding: 20px;
+}
+
+/* 共通タイトルスタイル */
+.title{
+  text-align: center;
+  color: #333;
+  font-weight: bold;
+  margin: 0 0 20px 0;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #ddd;
+  font-size: 20px;
+}
+
+
+.tableWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding: 16px 0;
+  align-items: center;
+  width: 100%;
+  max-width: 100%;
+}
+
+/* 共通セル罫線 */
+.scoreTableLowTd, .scoreTableLowTh,
+.scoreTableHighTd, .scoreTableHighTh {
+  border: none;
+}
+
+.borderSellLeft,
+.borderSellRight {
+  border-top: 1px solid #ccc;
+}
+
+/* ==============================
+   点数早見表テーブル
+   ============================== */
+
+/* 共通テーブルスタイル */
+.scoreTableLow,
+.scoreTableHigh {
+  border-collapse: separate;
+  border-spacing: 0;
+  text-align: center;
+  font-size: 12px;
+  table-layout: fixed;
+  background-color: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+@media (max-width: 600px) {
+  .scoreTableLow,
+  .scoreTableHigh {
+    font-size: 10px;
+    max-width: 100vw;
+    width: 100vw;
+    min-width: unset;
+  }
+  .scoreTableLowTh,
+  .scoreTableLowTd,
+  .scoreTableHighTh,
+  .scoreTableHighTd,
+  .hanRange {
+    padding: 4px 2px;
+  }
+  .ronScore {
+    font-size: 14px;
+  }
+  .tsumoScore {
+    font-size: 10px;
+  }
+  .manganText {
+    font-size: 13px;
+  }
+}
+
+.scoreTableLow {
+  width: 100%;
+  max-width: 900px;
+}
+
+.scoreTableHigh {
+  width: 640px;
+  min-width: 640px;
+}
+
+/* 共通セルスタイル */
+.scoreTableLowTh,
+.scoreTableLowTd,
+.scoreTableHighTh,
+.scoreTableHighTd,
+.hanRange {
+  padding: 8px 6px;
+  vertical-align: middle;
+}
+
+/* ヘッダーセル */
+
+.scoreTableLowTh,
+.scoreTableHighTh {
+  background-color: #fff;
+  font-weight: bold;
+  font-size: 20px;
+}
+
+.scoreTableHighTh {
+  font-size: 16px;
+}
+
+/* 通常セル */
+.scoreTableLowTd,
+.scoreTableHighTd {
+  background-color: #fff;
+  height: 34px;
+  border-top: 1px solid #ccc;
+}
+
+/* 符の列 */
+.fuColumn {
+  background-color: #fff;
+  color: #333;
+  font-weight: bold;
+  font-size: 18px;
+  border-top: 1px solid #ccc;
+}
+
+/* 翻数・役名の列 */
+.hanRange {
+  background-color: #fff;
+  font-weight: bold;
+  font-size: 15px;
+  border-top: 1px solid #ccc;
+}
+
+.hanLabel {
+  color: #333;
+  font-size: 16px;
+}
+
+.rankLabel {
+  color: #118745;
+  font-size: 18px;
+}
+/* ==============================
+   楕円ヘッダー
+   ============================== */
+
+.headerOval {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0 16px;
+  margin: -5px auto;
+  background-color: #118745;
+  color: #fff;
+  font-weight: bold;
+  font-size: 18px;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  letter-spacing: 0.05em;
+}
+
+.headerOvalParentChild {
+  height: 36px;
+  border-radius: 9999px;
+}
+
+.headerOvalFu {
+  height: 70px;
+  border-radius: 30px;
+}
+
+.headerOvalDouble {
+  flex-direction: column;
+  justify-content: center;
+  line-height: 1.2;
+}
+
+/* ==============================
+   点数表示
+   ============================== */
+
+.doubleLine {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 2px;
+  line-height: 1.3;
+}
+
+.mangan {
+  background-color: #e3f2fd;
+  font-weight: bold;
+}
+
+.manganText {
+  font-size: 20px;
+  font-weight: bold;
+  color: #d32f2f;
+  text-align: center;
+}
+
+.scoreOnly {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.ronScore {
+  font-size: 20px;
+  font-weight: bold;
+  color: #FFA726;
+}
+
+.tsumoScore {
+  font-size: 13px;
+  color: #333;
+  font-weight: bold;
+}
+
+.rankScore {
+  font-size: 20px;
+  font-weight: bold;
+  color: #d32f2f;
+}
+
+
+/* 右側の表の行高さ統一用 */
+.fuTableRightRow {
+  min-height: 56px;
+  height: 56px;
+}
+/* 右側の表のハイフン用 */
+.fuTableExampleHyphen {
+  color: #e53935;
+  font-weight: normal;
+  font-size: 2rem;
+}
+/* ==============================
+   符計算早見表 - 全体セクション
+   ============================== */
+
+.fuGuideSection {
+  margin-top: 40px;
+  border-radius: 12px;
+  overflow: hidden;
+  background-color: #fff;
+  padding: 20px;
+}
+
+.fuGuideTitle {
+  text-align: center;
+  color: #333;
+  font-weight: bold;
+  margin: 0 0 20px 0;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #ddd;
+  font-size: 18px;
+}
+
+/* ==============================
+   符計算早見表 - レイアウト
+   ============================== */
+
+.fuGuideContent {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+/* ==============================
+   符計算早見表 - カード群
+   ============================== */
+
+.fuGuideLeft {
+  flex-shrink: 0;
+  width: 340px;
+  min-width: 340px;
+  height: fit-content;
+}
+
+.fuRulesList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.fuRuleCardWrapper {
+  position: relative;
+  margin-bottom: 8px;
+}
+
+.fuRuleCardWrapper:last-child {
+  margin-bottom: 0;
+}
+
+.fuRuleCardWrapper:last-child .fuPlusSign {
+  display: none;
+}
+
+.fuPlusSign {
+  position: absolute;
+  bottom: -25px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 28px;
+  font-weight: 370;
+  color: #118745;
+  z-index: 10;
+  line-height: 1;
+}
+
+.fuRuleCard {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 20px;
+  background-color: #fff;
+  border:2px solid #118745;
+  min-height: 66px;
+}
+
+.fuRuleNumber {
+  font-size: 18px;
+  font-weight: bold;
+  color: #333;
+  flex-shrink: 0;
+  line-height: 1.4;
+}
+
+.fuRuleContent {
+  flex: 1;
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fuRuleTitle {
+  font-size: 17px;
+  font-weight: bold;
+  white-space: nowrap;
+  flex-shrink: 0;
+  width: 70px;
+  line-height: 1.4;
+}
+
+.fuRuleDesc {
+  font-size: 13px;
+  line-height: 1.4;
+  flex: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ==============================
+   符計算早見表 - 右側表エリア
+   ============================== */
+
+.fuGuideRight {
+  flex: 1;
+  width: auto;
+  display: flex;
+  flex-direction: row;
+  gap: -7px;
+  overflow-x: visible;
+  align-items: stretch;
+  height: 426px;
+  min-height: 426px;
+  max-height: 426px;
+}
+
+.fuTableBlockDouble {
+  flex: 0 0 auto;
+  min-width: 0;
+  background-color: white;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.fuTableBlock {
+  flex: 0 0 auto;
+  min-width: 0;
+  background-color: white;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.fuTablePair {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+}
+
+.fuTablePair > table {
+  flex: 1;
+}
+
+.fuTablePair > table:first-child {
+  flex: 1.3;
+}
+
+.fuTablePair > table:last-child {
+  flex: 1.7;
+}
+
+.fuTableTitle {
+  font-size: 14px;
+  font-weight: bold;
+  color: #333;
+  margin: 0 0 10px 0;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* ==============================
+   符計算早見表 - テーブルスタイル
+   ============================== */
+
+.fuDetailTable {
+  width: 100%;
+  border-collapse: collapse;
+  flex: 1;
+  min-height: 0;
+  background-color: #ffffff;
+}
+
+.fuDetailTable thead {
+  background-color: #ffffff;
+  color: #000;
+}
+
+.fuDetailTable th {
+  padding: 8px 8px;
+  text-align: center;
+  font-weight: bold;
+  font-size: 13px;
+  white-space: nowrap;
+  background-color: #ffffff;
+  border-bottom: 1px solid #ccc;
+}
+
+.fuDetailTable tbody {
+  background-color: #fff;
+  height: 100%;
+}
+
+.fuDetailTable tbody tr {
+  background-color: #fff;
+  min-height: 56px;
+  height: 56px;
+}
+
+.fuDetailTable tbody tr:nth-child(even) {
+  background-color: #fff;
+}
+
+.fuDetailTable tbody tr:hover {
+  background-color: #fff;
+}
+
+.fuDetailTable td {
+  border: none;
+  padding: 10px 6px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.4;
+  vertical-align: middle;
+}
+
+.fuTableLabel {
+  font-weight: bold;
+  background-color: #fff !important;
+  color: #000;
+}
+
+.fuTableKana {
+  font-size: 10px;
+  font-weight: normal;
+  color: #000;
+  margin-top: 2px;
+}
+
+.fuTableValue {
+  font-weight: bold;
+  font-size: 15px;
+  color: #000;
+}
+
+/* ==============================
+   符計算早見表 - 列幅統一
+   ============================== */
+
+/* 列幅統一 */
+/* 表1（左側）：メンツ・例・符 */
+.fuTablePair > table:first-child th:nth-child(1),
+.fuTablePair > table:first-child td:nth-child(1) {
+  width: 70px;
+  min-width: 70px;
+}
+
+/* 表1の「例」列 */
+.fuTablePair > table:first-child th:nth-child(2),
+.fuTablePair > table:first-child td:nth-child(2) {
+  width: 140px;
+  min-width: 140px;
+}
+
+/* 表1の「符」列 */
+.fuTablePair > table:first-child th:nth-child(3),
+.fuTablePair > table:first-child td:nth-child(3) {
+  width: 50px;
+  min-width: 50px;
+}
+
+/* 表2（右側）：例・符 */
+/* 表2の「例」列 */
+.fuTablePair > table:last-child th:nth-child(1),
+.fuTablePair > table:last-child td:nth-child(1) {
+  width: 140px;
+  min-width: 140px;
+}
+
+/* 表2の「符」列 */
+.fuTablePair > table:last-child th:nth-child(2),
+.fuTablePair > table:last-child td:nth-child(2) {
+  width: 50px;
+  min-width: 50px;
+}
+
+/* 表3（待ちの形）：名前・待ちの形・アガリ牌・符 */
+.fuTableBlock th:nth-child(1),
+.fuTableBlock td:nth-child(1) {
+  width: 70px;
+  min-width: 70px;
+}
+
+/* 表3の「待ちの形」列（例の牌画像） */
+.fuTableBlock th:nth-child(2),
+.fuTableBlock td:nth-child(2) {
+  width: 140px;
+  min-width: 140px;
+  max-width: 140px;
+}
+
+/* 表3の「符」列 */
+.fuTableBlock th:nth-child(3),
+.fuTableBlock td:nth-child(3) {
+  width: 50px;
+  min-width: 50px;
+}
+
+/* ==============================
+   符計算早見表 - 牌画像
+   ============================== */
+
+.tileImages {
+  display: flex;
+  gap: 0;
+  justify-content: center;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.tileImg,
+.tileImgBack {
+  height: 36px;
+  width: auto;
+  object-fit: contain;
+  display: block;
+}
+
+.tileImgRotated {
+  height: 26px;
+  width: auto;
+  object-fit: contain;
+  display: block;
+}
+
+/* ==============================
+   注釈（緑バージョン）
+   ============================== */
+
+.fuGuideNotes {
+  margin: 20px auto;
+  padding: 15px 20px;
+  background-color: #e6f5ee;   /* 薄緑 */
+  border-left: 4px solid #118745; /* 濃緑ライン */
+  border-radius: 4px;
+  width: 90%;
+}
+
+.fuGuideNotes p {
+  margin: 5px 0;
+  font-size: 14px;
+  color: #000; 
+  line-height: 1.6;
+}
