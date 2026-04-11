@@ -1,0 +1,24 @@
+name = "tanomahjang-backend"
+main = "backend/workers/worker.js"
+compatibility_date = "2024-01-01"
+
+# Node.js API を Workers で使う場合（必要なら）
+compatibility_flags = ["nodejs_compat"]
+
+# ローカルと本番の両方で同じ名前の DB / R2 を扱う
+# ======== D1 設定 ========
+[[d1_databases]]
+binding = "mahjang_db"
+database_name = "mahjang-db"
+database_id = "311b9b68-d869-4365-b098-0bb998609041"
+
+# ======== 変数 ========
+[vars]
+ACCOUNT_ID = "73a47c4101e20fefb35d17c47ddfa83c"
+
+
+# ======== ローカルで wrangler dev を動かす設定 ========
+[dev]
+ip = "127.0.0.1"
+port = 8787
+local_protocol = "http"

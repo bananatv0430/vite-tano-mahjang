@@ -119,7 +119,8 @@ export default function DataRegister() {
         }
 
         const data = await response.json();
-        const normalizedRules = (Array.isArray(data) ? data : data.rules ?? []).map(normalizeRule).filter((rule) => rule.id);
+        const rules = data.data;
+        const normalizedRules = (Array.isArray(rules) ? rules : []).map(normalizeRule).filter((rule) => rule.id);
 
         if (normalizedRules.length === 0) {
           throw new Error("基準ルールが登録されていません");
@@ -535,11 +536,18 @@ export default function DataRegister() {
         date: selectedDate,
         ruleId: Number(selectedRule.id),
         rounds: entryRows.map((round) => ({
-          players: round.players.map((player) => ({
-            playerId: Number(player.playerId),
-            score: Number(player.score ?? 0),
-            rank: Number(player.rank ?? 0),
-          })),
+          players: round.players.map((player, idx) => {
+            const score = Number(player.score ?? 0);
+            const rank = Number(player.rank ?? 0);
+            // final_pointを計算
+            const point = calculatePreviewPoint(score, rank, selectedRule);
+            return {
+              playerId: Number(player.playerId),
+              score,
+              rank,
+              point,
+            };
+          }),
         })),
       };
 

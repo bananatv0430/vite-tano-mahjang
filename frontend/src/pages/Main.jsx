@@ -16,7 +16,14 @@ const createFallbackIcon = (name) => {
 	return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 };
 
-const getIconSrc = (iconPath, name) => iconPath || createFallbackIcon(name);
+const getIconSrc = (iconPath, name, playerId) => {
+	if (iconPath) return iconPath;
+	// ローカル画像パスを優先
+	if (playerId && [1,2,3,4,5].includes(Number(playerId))) {
+		return `/assets/media/players/player_${playerId}.png`;
+	}
+	return createFallbackIcon(name);
+};
 
 const rankingConfigs = [
 	{ key: "personalScore", title: "個人スコア", valueLabel: "pt", formatter: (value) => Number(value ?? 0).toFixed(1) },
@@ -47,7 +54,7 @@ const normalizeRecentMatches = (dates = []) => dates.slice(0, 5).map((dateEntry)
 			.map((player) => ({
 				playerId: player.playerId,
 				name: player.name,
-				avatar: getIconSrc(player.iconPath, player.name),
+				avatar: getIconSrc(player.iconPath, player.name, player.playerId),
 				point: Number(player.finalPoint ?? 0),
 				rank: Number(player.rank ?? 0),
 			}))
@@ -56,14 +63,12 @@ const normalizeRecentMatches = (dates = []) => dates.slice(0, 5).map((dateEntry)
 
 	const totals = rounds.flatMap((round) => round.players).reduce((map, player) => {
 		const key = String(player.playerId ?? player.name);
-
 		if (!map[key]) {
 			map[key] = {
 				...player,
 				totalPoint: 0,
 			};
 		}
-
 		map[key].totalPoint += player.point;
 		return map;
 	}, {});
@@ -73,7 +78,7 @@ const normalizeRecentMatches = (dates = []) => dates.slice(0, 5).map((dateEntry)
 			playerId: player.playerId,
 			name: player.name,
 			iconPath: player.iconPath,
-			avatar: getIconSrc(player.iconPath, player.name),
+			avatar: getIconSrc(player.iconPath, player.name, player.playerId),
 			totalPoint: totals[String(player.playerId ?? player.name)]?.totalPoint ?? 0,
 		}))
 		.sort((a, b) => Number(a.playerId ?? 0) - Number(b.playerId ?? 0));
@@ -88,7 +93,7 @@ const normalizeRecentMatches = (dates = []) => dates.slice(0, 5).map((dateEntry)
 		year: displayDate.year,
 		month: displayDate.month,
 		day: displayDate.day,
-		dayText: dateEntry.day || "",
+		dayText: dateEntry.dayText || "",
 		participants,
 		winningPlayerId,
 		rounds,
@@ -152,11 +157,12 @@ const Main = () => {
 				}
 
 				const data = await response.json();
+				console.log('API /api/rankings/summary response:', data);
 				setRankings({
-					personalScore: data.personalScore ?? [],
-					highScore: data.highScore ?? [],
-					avoidFourthRate: data.avoidFourthRate ?? [],
-					topCount: data.topCount ?? [],
+					personalScore: data.data.personalScore ?? [],
+					highScore: data.data.highScore ?? [],
+					avoidFourthRate: data.data.avoidFourthRate ?? [],
+					topCount: data.data.topCount ?? [],
 				});
 			} catch (error) {
 				if (error.name !== "AbortError") {
@@ -188,7 +194,8 @@ const Main = () => {
 				}
 
 				const data = await response.json();
-				setRecentMatches(normalizeRecentMatches(data.dates ?? []));
+				console.log('API /api/results/recent response:', data);
+				setRecentMatches(normalizeRecentMatches(data.data ?? []));
 			} catch (error) {
 				if (error.name !== "AbortError") {
 					setRecentMatchesError(error.message || "直近の対戦履歴の取得に失敗しました");
@@ -407,7 +414,7 @@ const Main = () => {
 									</td>
 									<td className="p-ranking__personal-wrap">
 										<div className="p-ranking__personal-thumbnail">
-											<img alt={item.name} src={getIconSrc(item.iconPath, item.name)} />
+											<img alt={item.name} src={getIconSrc(item.iconPath, item.name, item.playerId)} />
 										</div>
 										<div className={`p-ranking__personal-name ${rankClass}`}>{item.name}</div>
 									</td>

@@ -161,8 +161,9 @@ export default function Player() {
         return res.json();
       })
       .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
-          setPlayers(data.map((player) => ({
+        const players = data.data;
+        if (Array.isArray(players) && players.length > 0) {
+          setPlayers(players.map((player) => ({
             ...player,
             icon_version: player.icon_path ? 1 : 0,
           })));

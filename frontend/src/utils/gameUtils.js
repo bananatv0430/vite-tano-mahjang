@@ -69,7 +69,7 @@ export const normalizeRule = (rule) => {
   const uma1 = Number(rule.uma1 ?? 0);
   const uma2 = Number(rule.uma2 ?? 0);
   const returnPoint = Number(rule.oka ?? rule.returnPoint ?? 0);
-  const startPoint = Number(rule.startScore ?? rule.startPoint ?? 0);
+  const startPoint = Number(rule.startScore ?? rule.start_score ?? rule.startPoint ?? 0);
 
   return {
     id: String(rule.id ?? ""),
