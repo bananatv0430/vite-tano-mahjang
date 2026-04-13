@@ -1,7 +1,6 @@
 
 import { db } from "../utils/db.js";
 import { format } from "../utils/format.js";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
 const routes = [];
 
