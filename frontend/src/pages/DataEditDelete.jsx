@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useLoadGameMasterData } from "../hooks/useLoadGameMasterData";
 import { useNavigate } from "react-router-dom";
 import DataEntryMessageModal from "../components/DataEntryMessageModal";
 import DataEntryRound from "../components/DataEntryRound";
@@ -24,16 +25,21 @@ export default function DataEditDelete() {
   const pendingFocusRef = useRef(null);
   const entryRowsRef = useRef([]);
   const [selectedDate, setSelectedDate] = useState("");
-  const [availableDates, setAvailableDates] = useState([]);
-  const [isLoadingDates, setIsLoadingDates] = useState(true);
-  const [dateOptionsError, setDateOptionsError] = useState("");
-  const [isLoadingDateData, setIsLoadingDateData] = useState(false);
-  const [ruleOptions, setRuleOptions] = useState(FALLBACK_RULES);
   const [selectedRuleId, setSelectedRuleId] = useState(FALLBACK_RULES[0].id);
-  const [rulesError, setRulesError] = useState("");
-  const [isLoadingRules, setIsLoadingRules] = useState(true);
-  const [playerOptions, setPlayerOptions] = useState(FALLBACK_PLAYERS);
   const [selectedPlayerIds, setSelectedPlayerIds] = useState(() => FALLBACK_PLAYERS.slice(0, 4).map((player) => player.id));
+  const [isLoadingDateData, setIsLoadingDateData] = useState(false);
+
+  // カスタムフックでマスターデータ取得
+  const {
+    availableDates,
+    isLoadingDates,
+    dateOptionsError,
+    playerOptions,
+    isLoadingPlayers,
+    ruleOptions,
+    isLoadingRules,
+    rulesError,
+  } = useLoadGameMasterData();
   const [entryRows, setEntryRows] = useState(() => [createRound(1, FALLBACK_PLAYERS, FALLBACK_RULES[0].startPoint)]);
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [roundPageStart, setRoundPageStart] = useState(0);
@@ -49,143 +55,36 @@ export default function DataEditDelete() {
   const [isDateDeleteConfirmOpen, setIsDateDeleteConfirmOpen] = useState(false);
   const navigate = useNavigate();
 
+  // 初回マウント時にメイン要素へクラス付与
   useEffect(() => {
     const main = mainRef.current;
-    if (main) {
-      main.classList.add("-active");
-    }
+    if (main) main.classList.add("-active");
   }, []);
 
+  // ウィンドウリサイズ時にモバイル判定を更新
   useEffect(() => {
-    const handleResize = () => {
-      setIsMobileView(window.innerWidth <= 767);
-    };
-
+    const handleResize = () => setIsMobileView(window.innerWidth <= 767);
     handleResize();
     window.addEventListener("resize", handleResize);
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
-    };
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // 選択中の試合がある場合、Escキーで解除
   useEffect(() => {
-    if (!selectedMatch) {
-      return undefined;
-    }
-
+    if (!selectedMatch) return;
     const handleKeyDown = (event) => {
-      if (event.key === "Escape") {
-        setSelectedMatch(null);
-      }
+      if (event.key === "Escape") setSelectedMatch(null);
     };
-
     window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedMatch]);
 
+  // 選択中の日付がマスターデータから消えた場合はリセット
   useEffect(() => {
-    const controller = new AbortController();
-
-    const loadAvailableDates = async () => {
-      setIsLoadingDates(true);
-      setDateOptionsError("");
-
-      try {
-        const response = await fetch("/api/games/dates", { signal: controller.signal });
-        if (!response.ok) {
-          throw new Error("対局日の取得に失敗しました");
-        }
-
-        const data = await response.json();
-        const normalizedDates = (Array.isArray(data) ? data : data.dates ?? [])
-          .map((date) => String(date ?? "").trim())
-          .filter(Boolean);
-
-        setAvailableDates(normalizedDates);
-        setSelectedDate((current) => (normalizedDates.includes(current) ? current : ""));
-      } catch (error) {
-        if (error.name !== "AbortError") {
-          setAvailableDates([]);
-          setDateOptionsError(error.message || "対局日の取得に失敗しました");
-          setSelectedDate("");
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setIsLoadingDates(false);
-        }
-      }
-    };
-
-    const loadPlayers = async () => {
-      try {
-        const response = await fetch("/api/players", { signal: controller.signal });
-        if (!response.ok) {
-          throw new Error("プレイヤー情報の取得に失敗しました");
-        }
-
-        const data = await response.json();
-        const normalizedPlayers = (Array.isArray(data) ? data : []).map(normalizePlayer).filter((player) => player.id);
-
-        if (normalizedPlayers.length > 0) {
-          setPlayerOptions(normalizedPlayers);
-          setSelectedPlayerIds((current) => {
-            const hasCurrentPlayers = current.length === 4 && current.every((id) => normalizedPlayers.some((player) => player.id === String(id)));
-            return hasCurrentPlayers ? current.map(String) : normalizedPlayers.slice(0, 4).map((player) => player.id);
-          });
-        }
-      } catch (error) {
-        if (error.name !== "AbortError") {
-          setPlayerOptions(FALLBACK_PLAYERS);
-        }
-      }
-    };
-
-    const loadRules = async () => {
-      setIsLoadingRules(true);
-      setRulesError("");
-
-      try {
-        const response = await fetch("/api/rules", { signal: controller.signal });
-        if (!response.ok) {
-          throw new Error("基準ルールの取得に失敗しました");
-        }
-
-        const data = await response.json();
-        const normalizedRules = (Array.isArray(data) ? data : data.rules ?? []).map(normalizeRule).filter((rule) => rule.id);
-
-        if (normalizedRules.length === 0) {
-          throw new Error("基準ルールが登録されていません");
-        }
-
-        setRuleOptions(normalizedRules);
-        setSelectedRuleId((current) => (
-          normalizedRules.some((rule) => rule.id === String(current)) ? String(current) : normalizedRules[0].id
-        ));
-      } catch (error) {
-        if (error.name !== "AbortError") {
-          setRulesError(error.message || "基準ルールの取得に失敗しました");
-          setRuleOptions(FALLBACK_RULES);
-          setSelectedRuleId(FALLBACK_RULES[0].id);
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setIsLoadingRules(false);
-        }
-      }
-    };
-
-    loadAvailableDates();
-    loadPlayers();
-    loadRules();
-
-    return () => {
-      controller.abort();
-    };
-  }, []);
+    if (!availableDates.includes(selectedDate)) {
+      setSelectedDate("");
+    }
+  }, [availableDates, selectedDate]);
 
   const selectedRule = useMemo(
     () => ruleOptions.find((rule) => rule.id === String(selectedRuleId)) ?? ruleOptions[0] ?? FALLBACK_RULES[0],
@@ -229,87 +128,76 @@ export default function DataEditDelete() {
     [playerOptions, selectedPlayerIds]
   );
 
-  useEffect(() => {
-    if (!selectedDate) {
+  // 日付データ取得ロジックを関数化
+  const loadDateGames = useCallback(async (date) => {
+    if (!date) {
       setSelectedMatch(null);
       setRoundPageStart(0);
       setSlideDirection("next");
       setStatusMessage("");
-      return undefined;
+      return;
     }
-
     const controller = new AbortController();
-
-    const loadDateGames = async () => {
-      setIsLoadingDateData(true);
-      setStatusMessage("");
-
-      try {
-        const response = await fetch(`/api/games?date=${encodeURIComponent(selectedDate)}`, { signal: controller.signal });
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || "対象日の対局データ取得に失敗しました");
-        }
-
-        const data = await response.json();
-        const nextParticipantIds = (Array.isArray(data.participants) ? data.participants : [])
-          .map((player) => String(player.playerId ?? player.id ?? "").trim())
-          .filter(Boolean)
-          .sort((a, b) => Number(a) - Number(b))
-          .slice(0, 4);
-
-        const fallbackPlayerIds = playerOptions.slice(0, 4).map((player) => player.id);
-        const resolvedPlayerIds = nextParticipantIds.length === 4 ? nextParticipantIds : fallbackPlayerIds;
-        const resolvedRuleId = String(data.ruleId ?? FALLBACK_RULES[0].id);
-        const resolvedRule = ruleOptions.find((rule) => rule.id === resolvedRuleId) ?? FALLBACK_RULES[0];
-        const nextGames = Array.isArray(data.games) ? data.games : [];
-
-        const nextEntryRows = nextGames.length > 0
-          ? nextGames.map((game, index) => {
-              const playerMap = new Map(
-                (Array.isArray(game.players) ? game.players : []).map((player) => [String(player.playerId), player])
-              );
-
-              return {
-                id: `game-${game.gameId ?? selectedDate}-${index}`,
-                gameId: game.gameId ?? null,
-                matchNumber: Number(game.matchNumber ?? index + 1),
-                players: resolvedPlayerIds.map((playerId, playerIndex) => {
-                  const targetPlayer = playerMap.get(String(playerId));
-
-                  return {
-                    playerId: String(playerId),
-                    score: String(targetPlayer?.finalScore ?? resolvedRule.startPoint ?? 0),
-                    rank: String(targetPlayer?.rank ?? playerIndex + 1),
-                  };
-                }),
-              };
-            })
-          : [createRound(1, playerOptions, resolvedRule.startPoint)];
-
-        setSelectedRuleId(resolvedRuleId);
-        setSelectedPlayerIds(resolvedPlayerIds);
-        setEntryRows(nextEntryRows);
-        setSelectedMatch(null);
-        setRoundPageStart(0);
-        setSlideDirection("next");
-      } catch (error) {
-        if (error.name !== "AbortError") {
-          setStatusTone("error");
-          setStatusMessage(error.message || "対象日の対局データ取得に失敗しました");
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setIsLoadingDateData(false);
-        }
+    setIsLoadingDateData(true);
+    setStatusMessage("");
+    try {
+      const response = await fetch(`/api/games/by-date?date=${encodeURIComponent(date)}`, { signal: controller.signal });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "対象日の対局データ取得に失敗しました");
       }
-    };
+      const data = await response.json();
+      const nextParticipantIds = (Array.isArray(data.participants) ? data.participants : [])
+        .map((player) => String(player.playerId ?? player.id ?? "").trim())
+        .filter(Boolean)
+        .sort((a, b) => Number(a) - Number(b))
+        .slice(0, 4);
+      const fallbackPlayerIds = playerOptions.slice(0, 4).map((player) => player.id);
+      const resolvedPlayerIds = nextParticipantIds.length === 4 ? nextParticipantIds : fallbackPlayerIds;
+      const resolvedRuleId = String(data.ruleId ?? FALLBACK_RULES[0].id);
+      const resolvedRule = ruleOptions.find((rule) => rule.id === resolvedRuleId) ?? FALLBACK_RULES[0];
+      const nextGames = Array.isArray(data.games) ? data.games : [];
+      const nextEntryRows = nextGames.length > 0
+        ? nextGames.map((game, index) => {
+            const playerMap = new Map(
+              (Array.isArray(game.players) ? game.players : []).map((player) => [String(player.playerId), player])
+            );
+            return {
+              id: `game-${game.gameId ?? date}-${index}`,
+              gameId: game.gameId ?? null,
+              matchNumber: Number(game.matchNumber ?? index + 1),
+              players: resolvedPlayerIds.map((playerId, playerIndex) => {
+                const targetPlayer = playerMap.get(String(playerId));
+                return {
+                  playerId: String(playerId),
+                  score: String(targetPlayer?.finalScore ?? resolvedRule.startPoint ?? 0),
+                  rank: String(targetPlayer?.rank ?? playerIndex + 1),
+                };
+              }),
+            };
+          })
+        : [createRound(1, playerOptions, resolvedRule.startPoint)];
+      setSelectedRuleId(resolvedRuleId);
+      setSelectedPlayerIds(resolvedPlayerIds);
+      setEntryRows(nextEntryRows);
+      setSelectedMatch(null);
+      setRoundPageStart(0);
+      setSlideDirection("next");
+    } catch (error) {
+      if (error.name !== "AbortError") {
+        setStatusTone("error");
+        setStatusMessage(error.message || "対象日の対局データ取得に失敗しました");
+      }
+    } finally {
+      if (!controller.signal.aborted) setIsLoadingDateData(false);
+    }
+    return () => controller.abort();
+  }, [playerOptions, ruleOptions]);
 
-    loadDateGames();
-
-    return () => {
-      controller.abort();
-    };
+  // 日付・プレイヤー・ルールが揃ったらデータ取得
+  useEffect(() => {
+    loadDateGames(selectedDate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerOptions, ruleOptions, selectedDate]);
 
   const displayRule = isDateSelected
@@ -795,6 +683,7 @@ export default function DataEditDelete() {
         })),
       };
 
+      // 日付単位の一括更新APIを呼び出す
       const response = await fetch("/api/games", {
         method: "PUT",
         headers: {

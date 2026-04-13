@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useLoadRankings, useLoadRecentMatches } from "../hooks/useLoadMainData";
 import { Link } from "react-router-dom";
 import ResultsPreviewModal from "../components/ResultsPreviewModal";
 
@@ -16,13 +17,15 @@ const createFallbackIcon = (name) => {
 	return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 };
 
-const getIconSrc = (iconPath, name, playerId) => {
-	if (iconPath) return iconPath;
-	// ローカル画像パスを優先
+
+import { getIconSrc } from "../utils/getIconSrc";
+
+// ローカル画像優先＋共通getIconSrcラッパー
+const getMainIconSrc = (iconPath, iconVersion, name, playerId) => {
 	if (playerId && [1,2,3,4,5].includes(Number(playerId))) {
 		return `/assets/media/players/player_${playerId}.png`;
 	}
-	return createFallbackIcon(name);
+	return getIconSrc(iconPath, iconVersion, createFallbackIcon(name));
 };
 
 const rankingConfigs = [
@@ -54,7 +57,7 @@ const normalizeRecentMatches = (dates = []) => dates.slice(0, 5).map((dateEntry)
 			.map((player) => ({
 				playerId: player.playerId,
 				name: player.name,
-				avatar: getIconSrc(player.iconPath, player.name, player.playerId),
+				avatar: getMainIconSrc(player.iconPath, player.iconVersion, player.name, player.playerId),
 				point: Number(player.finalPoint ?? 0),
 				rank: Number(player.rank ?? 0),
 			}))
@@ -78,7 +81,7 @@ const normalizeRecentMatches = (dates = []) => dates.slice(0, 5).map((dateEntry)
 			playerId: player.playerId,
 			name: player.name,
 			iconPath: player.iconPath,
-			avatar: getIconSrc(player.iconPath, player.name, player.playerId),
+			avatar: getMainIconSrc(player.iconPath, player.iconVersion, player.name, player.playerId),
 			totalPoint: totals[String(player.playerId ?? player.name)]?.totalPoint ?? 0,
 		}))
 		.sort((a, b) => Number(a.playerId ?? 0) - Number(b.playerId ?? 0));
@@ -101,17 +104,9 @@ const normalizeRecentMatches = (dates = []) => dates.slice(0, 5).map((dateEntry)
 });
 
 const Main = () => {
-	const [rankings, setRankings] = useState({
-		personalScore: [],
-		highScore: [],
-		avoidFourthRate: [],
-		topCount: [],
-	});
-	const [isLoadingRankings, setIsLoadingRankings] = useState(true);
-	const [rankingError, setRankingError] = useState("");
-	const [recentMatches, setRecentMatches] = useState([]);
-	const [isLoadingRecentMatches, setIsLoadingRecentMatches] = useState(true);
-	const [recentMatchesError, setRecentMatchesError] = useState("");
+	// カスタムフックでランキング・直近対戦履歴を取得
+	const { rankings, isLoadingRankings, rankingError } = useLoadRankings();
+	const { recentMatches, isLoadingRecentMatches, recentMatchesError } = useLoadRecentMatches(normalizeRecentMatches);
 	const [selectedMatch, setSelectedMatch] = useState(null);
 	const [roundPageStart, setRoundPageStart] = useState(0);
 	const [slideDirection, setSlideDirection] = useState("next");
@@ -143,74 +138,6 @@ const Main = () => {
 		return () => window.removeEventListener("keydown", handleKeyDown);
 	}, [selectedMatch]);
 
-	useEffect(() => {
-		const controller = new AbortController();
-
-		const loadRankings = async () => {
-			setIsLoadingRankings(true);
-			setRankingError("");
-
-			try {
-				const response = await fetch("/api/rankings/summary", { signal: controller.signal });
-				if (!response.ok) {
-					throw new Error("ランキングデータの取得に失敗しました");
-				}
-
-				const data = await response.json();
-				console.log('API /api/rankings/summary response:', data);
-				setRankings({
-					personalScore: data.data.personalScore ?? [],
-					highScore: data.data.highScore ?? [],
-					avoidFourthRate: data.data.avoidFourthRate ?? [],
-					topCount: data.data.topCount ?? [],
-				});
-			} catch (error) {
-				if (error.name !== "AbortError") {
-					setRankingError(error.message || "ランキングデータの取得に失敗しました");
-				}
-			} finally {
-				if (!controller.signal.aborted) {
-					setIsLoadingRankings(false);
-				}
-			}
-		};
-
-		loadRankings();
-
-		return () => controller.abort();
-	}, []);
-
-	useEffect(() => {
-		const controller = new AbortController();
-
-		const loadRecentMatches = async () => {
-			setIsLoadingRecentMatches(true);
-			setRecentMatchesError("");
-
-			try {
-				const response = await fetch("/api/results/recent?limit=5", { signal: controller.signal });
-				if (!response.ok) {
-					throw new Error("直近の対戦履歴の取得に失敗しました");
-				}
-
-				const data = await response.json();
-				console.log('API /api/results/recent response:', data);
-				setRecentMatches(normalizeRecentMatches(data.data ?? []));
-			} catch (error) {
-				if (error.name !== "AbortError") {
-					setRecentMatchesError(error.message || "直近の対戦履歴の取得に失敗しました");
-				}
-			} finally {
-				if (!controller.signal.aborted) {
-					setIsLoadingRecentMatches(false);
-				}
-			}
-		};
-
-		loadRecentMatches();
-
-		return () => controller.abort();
-	}, []);
 
 	const roundsPerPage = isMobileView ? 1 : 2;
 	const pageCount = selectedMatch ? 1 + Math.ceil(selectedMatch.rounds.length / roundsPerPage) : 1;
@@ -414,7 +341,7 @@ const Main = () => {
 									</td>
 									<td className="p-ranking__personal-wrap">
 										<div className="p-ranking__personal-thumbnail">
-											<img alt={item.name} src={getIconSrc(item.iconPath, item.name, item.playerId)} />
+											<img alt={item.name} src={getMainIconSrc(item.iconPath, item.iconVersion, item.name, item.playerId)} />
 										</div>
 										<div className={`p-ranking__personal-name ${rankClass}`}>{item.name}</div>
 									</td>

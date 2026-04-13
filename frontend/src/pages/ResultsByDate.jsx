@@ -1,7 +1,32 @@
 
 import { useEffect, useRef, useState } from "react";
+import { useLoadResultsByYear } from "../hooks/useLoadResultsByYear";
 import ResultsPreviewModal from "../components/ResultsPreviewModal";
-import { formatDisplayDate, getPlayerImageSrc } from "../utils/gameUtils";
+import { formatDisplayDate } from "../utils/gameUtils";
+import { getIconSrc } from "../utils/getIconSrc";
+
+
+// fallbackアイコン生成
+const createFallbackIcon = (name) => {
+  const firstChar = String(name ?? "?").slice(0, 1);
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
+      <rect width="120" height="120" rx="60" fill="#f4f4f4"/>
+      <circle cx="60" cy="45" r="22" fill="#f08300" opacity="0.92"/>
+      <path d="M24 104c6-22 20-33 36-33s30 11 36 33" fill="#f08300" opacity="0.86"/>
+      <text x="60" y="52" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#ffffff">${firstChar}</text>
+    </svg>
+  `;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+};
+
+// 共通getIconSrcラッパー
+const getMainIconSrc = (iconPath, iconVersion, name, playerId) => {
+  if (playerId && [1,2,3,4,5].includes(Number(playerId))) {
+    return `/assets/media/players/player_${playerId}.png`;
+  }
+  return getIconSrc(iconPath, iconVersion, createFallbackIcon(name));
+};
 
 const normalizeMatchData = (dates = []) => dates.map((dateEntry) => {
   const rounds = (dateEntry.games ?? []).map((game, index) => ({
@@ -15,7 +40,7 @@ const normalizeMatchData = (dates = []) => dates.map((dateEntry) => {
         point: Number(player.finalPoint ?? 0),
         finalScore: Number(player.finalScore ?? 0),
         rank: Number(player.rank ?? 0),
-        avatar: getPlayerImageSrc(player.iconPath, player.name),
+        avatar: getMainIconSrc(player.iconPath, player.iconVersion, player.name, player.playerId),
       }))
       .sort((a, b) => a.rank - b.rank),
   }));
@@ -38,7 +63,7 @@ const normalizeMatchData = (dates = []) => dates.map((dateEntry) => {
     .map((player) => ({
       playerId: player.playerId,
       name: player.name,
-      avatar: getPlayerImageSrc(player.iconPath, player.name),
+      avatar: getMainIconSrc(player.iconPath, player.iconVersion, player.name, player.playerId),
       totalPoint: totalMap[String(player.playerId ?? player.name)]?.totalPoint ?? 0,
     }))
     .sort((a, b) => b.totalPoint - a.totalPoint);
@@ -55,16 +80,20 @@ const normalizeMatchData = (dates = []) => dates.map((dateEntry) => {
 
 export default function ResultsByDate() {
   const mainRef = useRef(null);
-  const [selectedYear, setSelectedYear] = useState("");
+  // カスタムフックで年ごとの対戦履歴データ取得
+  const {
+    selectedYear,
+    setSelectedYear,
+    yearOptions,
+    resultsByYear,
+    displayedMatches,
+    isLoading,
+    loadError,
+  } = useLoadResultsByYear(normalizeMatchData);
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [roundPageStart, setRoundPageStart] = useState(0);
   const [slideDirection, setSlideDirection] = useState("next");
   const [isMobileView, setIsMobileView] = useState(() => (typeof window !== "undefined" ? window.innerWidth <= 767 : false));
-  const [yearOptions, setYearOptions] = useState([]);
-  const [resultsByYear, setResultsByYear] = useState({});
-  const [displayedMatches, setDisplayedMatches] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     const main = mainRef.current;
@@ -73,6 +102,7 @@ export default function ResultsByDate() {
     }
   }, []);
 
+  // 年度切替時は選択中の試合・ページをリセット
   useEffect(() => {
     setSelectedMatch(null);
     setRoundPageStart(0);
@@ -195,13 +225,7 @@ export default function ResultsByDate() {
     };
   }, [selectedYear, resultsByYear]);
 
-  useEffect(() => {
-    if (!selectedYear || !Object.prototype.hasOwnProperty.call(resultsByYear, selectedYear)) {
-      return;
-    }
-
-    setDisplayedMatches(resultsByYear[selectedYear] ?? []);
-  }, [resultsByYear, selectedYear]);
+  // 表示用データはカスタムフックのdisplayedMatchesをそのまま利用
 
   const matches = displayedMatches;
   const roundsPerPage = isMobileView ? 1 : 2;

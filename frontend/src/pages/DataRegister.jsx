@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useLoadPlayersAndRules } from "../hooks/useLoadPlayersAndRules";
 import { useNavigate } from "react-router-dom";
 import DataEntryMessageModal from "../components/DataEntryMessageModal";
 import DataEntryRound from "../components/DataEntryRound";
@@ -8,7 +9,6 @@ import {
   FALLBACK_RULES,
   buildAutoRanks,
   calculatePreviewPoint,
-  createAvatar,
   createRound,
   formatDisplayDate,
   formatNumber,
@@ -17,6 +17,8 @@ import {
   normalizePlayer,
   normalizeRule,
 } from "../utils/gameUtils";
+import { getIconSrc } from "../utils/getIconSrc";
+import { createFallbackIcon } from "../utils/createFallbackIcon";
 
 export default function DataRegister() {
   const mainRef = useRef(null);
@@ -24,12 +26,17 @@ export default function DataRegister() {
   const pendingFocusRef = useRef(null);
   const entryRowsRef = useRef([]);
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [ruleOptions, setRuleOptions] = useState(FALLBACK_RULES);
   const [selectedRuleId, setSelectedRuleId] = useState(FALLBACK_RULES[0].id);
-  const [rulesError, setRulesError] = useState("");
-  const [isLoadingRules, setIsLoadingRules] = useState(true);
-  const [playerOptions, setPlayerOptions] = useState(FALLBACK_PLAYERS);
   const [selectedPlayerIds, setSelectedPlayerIds] = useState(() => FALLBACK_PLAYERS.slice(0, 4).map((player) => player.id));
+
+  // カスタムフックでプレイヤー・ルール取得
+  const {
+    playerOptions,
+    isLoadingPlayers,
+    ruleOptions,
+    isLoadingRules,
+    rulesError,
+  } = useLoadPlayersAndRules();
   const [entryRows, setEntryRows] = useState(() => [createRound(1, FALLBACK_PLAYERS, FALLBACK_RULES[0].startPoint)]);
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [roundPageStart, setRoundPageStart] = useState(0);
@@ -43,113 +50,46 @@ export default function DataRegister() {
   const [dragOverRoundId, setDragOverRoundId] = useState(null);
   const navigate = useNavigate();
 
+  // 初回マウント時にメイン要素へクラス付与
   useEffect(() => {
     const main = mainRef.current;
-    if (main) {
-      main.classList.add("-active");
-    }
+    if (main) main.classList.add("-active");
   }, []);
 
+  // ウィンドウリサイズ時にモバイル判定を更新
   useEffect(() => {
-    const handleResize = () => {
-      setIsMobileView(window.innerWidth <= 767);
-    };
-
+    const handleResize = () => setIsMobileView(window.innerWidth <= 767);
     handleResize();
     window.addEventListener("resize", handleResize);
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
-    };
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // 選択中の試合がある場合、Escキーで解除
   useEffect(() => {
-    if (!selectedMatch) {
-      return undefined;
-    }
-
+    if (!selectedMatch) return;
     const handleKeyDown = (event) => {
-      if (event.key === "Escape") {
-        setSelectedMatch(null);
-      }
+      if (event.key === "Escape") setSelectedMatch(null);
     };
-
     window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedMatch]);
 
+  // プレイヤー・ルールが切り替わった場合、選択状態を補正
   useEffect(() => {
-    const controller = new AbortController();
-
-    const loadPlayers = async () => {
-      try {
-        const response = await fetch("/api/players", { signal: controller.signal });
-        if (!response.ok) {
-          throw new Error("プレイヤー情報の取得に失敗しました");
-        }
-
-        const data = await response.json();
-        const normalizedPlayers = (Array.isArray(data) ? data : []).map(normalizePlayer).filter((player) => player.id);
-
-        if (normalizedPlayers.length > 0) {
-          setPlayerOptions(normalizedPlayers);
-          setSelectedPlayerIds((current) => {
-            const hasCurrentPlayers = current.length === 4 && current.every((id) => normalizedPlayers.some((player) => player.id === String(id)));
-            return hasCurrentPlayers ? current.map(String) : normalizedPlayers.slice(0, 4).map((player) => player.id);
-          });
-        }
-      } catch (error) {
-        if (error.name !== "AbortError") {
-          setPlayerOptions(FALLBACK_PLAYERS);
-        }
-      }
-    };
-
-    const loadRules = async () => {
-      setIsLoadingRules(true);
-      setRulesError("");
-
-      try {
-        const response = await fetch("/api/rules", { signal: controller.signal });
-        if (!response.ok) {
-          throw new Error("基準ルールの取得に失敗しました");
-        }
-
-        const data = await response.json();
-        const rules = data.data;
-        const normalizedRules = (Array.isArray(rules) ? rules : []).map(normalizeRule).filter((rule) => rule.id);
-
-        if (normalizedRules.length === 0) {
-          throw new Error("基準ルールが登録されていません");
-        }
-
-        setRuleOptions(normalizedRules);
-        setSelectedRuleId((current) => (
-          normalizedRules.some((rule) => rule.id === String(current)) ? String(current) : normalizedRules[0].id
-        ));
-      } catch (error) {
-        if (error.name !== "AbortError") {
-          setRulesError(error.message || "基準ルールの取得に失敗しました");
-          setRuleOptions(FALLBACK_RULES);
-          setSelectedRuleId(FALLBACK_RULES[0].id);
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setIsLoadingRules(false);
-        }
-      }
-    };
-
-    loadPlayers();
-    loadRules();
-
-    return () => {
-      controller.abort();
-    };
-  }, []);
+    // プレイヤー
+    if (playerOptions.length > 0) {
+      setSelectedPlayerIds((current) => {
+        const hasCurrentPlayers = current.length === 4 && current.every((id) => playerOptions.some((player) => player.id === String(id)));
+        return hasCurrentPlayers ? current.map(String) : playerOptions.slice(0, 4).map((player) => player.id);
+      });
+    }
+    // ルール
+    if (ruleOptions.length > 0) {
+      setSelectedRuleId((current) => (
+        ruleOptions.some((rule) => rule.id === String(current)) ? String(current) : ruleOptions[0].id
+      ));
+    }
+  }, [playerOptions, ruleOptions]);
 
   const selectedRule = useMemo(
     () => ruleOptions.find((rule) => rule.id === String(selectedRuleId)) ?? ruleOptions[0] ?? FALLBACK_RULES[0],
@@ -179,13 +119,18 @@ export default function DataRegister() {
   const hasDuplicateSelectedPlayers = new Set(normalizedSelectedPlayerIds).size !== normalizedSelectedPlayerIds.length;
   const isRegisterDisabled = isSubmitting || hasInvalidRoundTotal || !hasAllPlayersSelected || hasDuplicateSelectedPlayers || !!rulesError || isLoadingRules;
 
+  // 共通getIconSrcラッパー
+  const getPlayerIconSrc = (iconPath, name) => {
+    return getIconSrc(iconPath, createFallbackIcon(name));
+  };
+
   const selectedPlayers = useMemo(
     () => selectedPlayerIds.map((playerId, index) => {
       const player = playerOptions.find((item) => item.id === playerId);
       return player ?? {
         id: `temp-${index}`,
         name: `プレイヤー${index + 1}`,
-        avatar: createAvatar(String(index + 1)),
+        avatar: getPlayerIconSrc(undefined, String(index + 1)),
       };
     }),
     [playerOptions, selectedPlayerIds]
@@ -205,10 +150,22 @@ export default function DataRegister() {
           const playerName = selectedPlayer?.name || `プレイヤー${playerIndex + 1}`;
           const rank = Number(player.rank || playerIndex + 1);
 
+          // プレイヤー情報からiconPath/iconVersionを優先的に取得し、なければselectedPlayerから取得
+          const iconPath = player.iconPath !== undefined ? player.iconPath : selectedPlayer?.iconPath;
+          const avatar = getPlayerIconSrc(iconPath, playerName);
+          // デバッグ用ログ
+          console.log('[buildPreviewMatch] player', {
+            playerIndex,
+            playerName,
+            iconPath,
+            avatar,
+            selectedPlayer,
+            player,
+          });
           return {
             playerId: selectedPlayer?.id ?? `temp-${round.id}-${playerIndex}`,
             name: playerName,
-            avatar: selectedPlayer?.avatar ?? createAvatar(playerName),
+            avatar,
             rank,
             point: calculatePreviewPoint(player.score, rank, selectedRule),
           };
@@ -488,9 +445,12 @@ export default function DataRegister() {
   }, []);
 
   const openPreviewMatch = useCallback(() => {
+    console.log('[openPreviewMatch] called');
     setRoundPageStart(0);
     setSlideDirection("next");
-    setSelectedMatch(buildPreviewMatch());
+    const preview = buildPreviewMatch();
+    console.log('[openPreviewMatch] preview', preview);
+    setSelectedMatch(preview);
   }, [buildPreviewMatch]);
 
   const resetEntryForm = useCallback(() => {

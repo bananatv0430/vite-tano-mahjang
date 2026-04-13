@@ -1,19 +1,29 @@
 
+
 import { useEffect, useRef, useState } from "react";
 
-export default function Player() {
-  const mainRef = useRef(null);
-  const fallbackIcon = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+import { getIconSrc } from "../utils/getIconSrc";
+
+// fallbackアイコン生成
+const createFallbackIcon = (name) => {
+  const firstChar = String(name ?? "?").slice(0, 1);
+  const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
       <circle cx="60" cy="60" r="58" fill="#ffffff" stroke="#b5b5b5" stroke-width="2" />
       <text x="60" y="66" text-anchor="middle" font-size="12" fill="#888">NO IMAGE</text>
+      <text x="60" y="100" text-anchor="middle" font-size="32" fill="#bbb">${firstChar}</text>
     </svg>
-  `)}`;
-  const getIconSrc = (iconPath, iconVersion) => {
-    if (!iconPath) return fallbackIcon;
-    const separator = iconPath.includes("?") ? "&" : "?";
-    return `${iconPath}${separator}v=${iconVersion || 1}`;
-  };
+  `;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+};
+
+// 共通getIconSrcラッパー
+const getPlayerIconSrc = (iconPath, iconVersion, name) => {
+  return getIconSrc(iconPath, iconVersion, createFallbackIcon(name));
+};
+
+export default function Player() {
+  const mainRef = useRef(null);
 
   const [players, setPlayers] = useState([]);
   const [editingPlayer, setEditingPlayer] = useState(null);
@@ -48,7 +58,7 @@ export default function Player() {
       name: player?.name ?? "",
       icon_path: player?.icon_path ?? "",
     });
-    setIconPreview(getIconSrc(player?.icon_path, player?.icon_version));
+    setIconPreview(getPlayerIconSrc(player?.icon_path, player?.icon_version, player?.name));
   };
 
   const closeEditor = () => {
@@ -139,7 +149,7 @@ export default function Player() {
 
       setPlayers((prev) => prev.map((player) => (
         player.id === editingPlayer.id
-          ? { ...data, icon_version: Date.now() }
+          ? { ...(data.data || data), icon_version: Date.now() }
           : player
       )));
       closeEditor();
@@ -169,13 +179,13 @@ export default function Player() {
           })));
         } else {
           setPlayers([
-            { id: 0, name: "(データなし)", age: "--", hometown: "--", career_years: "--", icon_version: 0 }
+            { id: 0, name: "(データなし)", icon_version: 0 }
           ]);
         }
       })
       .catch(() => {
         setPlayers([
-          { id: 0, name: "(データ取得エラー)", age: "--", hometown: "--", career_years: "--" }
+          { id: 0, name: "(データ取得エラー)", age: "--"}
         ]);
       });
   }, []);
@@ -213,7 +223,7 @@ export default function Player() {
       await Promise.all(players.map(async (player) => {
         if (!player.id) return;
         try {
-          const res = await fetch(`/api/player-stats/${player.id}`, { signal: controller.signal });
+          const res = await fetch(`/api/players/player-stats/${player.id}`, { signal: controller.signal });
           if (res.ok) {
             const data = await res.json();
             if (data && data.total) statsObj[player.id] = data;
@@ -246,10 +256,10 @@ export default function Player() {
                           <div>
                             <img
                               alt=""
-                              src={getIconSrc(player.icon_path, player.icon_version)}
+                              src={getPlayerIconSrc(player.icon_path, player.icon_version, player.name)}
                               onError={(e) => {
                                 e.currentTarget.onerror = null;
-                                e.currentTarget.src = fallbackIcon;
+                                e.currentTarget.src = createFallbackIcon(player.name);
                               }}
                               style={{
                                 width: '120px',
@@ -300,7 +310,7 @@ export default function Player() {
                                 <tr>
                                   <th scope="row">合計</th>
                                   <td>{playerStatsMap[player.id].total.totalPoint > 0 ? `+${playerStatsMap[player.id].total.totalPoint}pt` : `${playerStatsMap[player.id].total.totalPoint}pt`}</td>
-                                  <td>{(playerStatsMap[player.id].total.avoidFourthRate * 100).toFixed(1)}%</td>
+                                  <td>{playerStatsMap[player.id].total.avoidFourthRate?.toFixed(3)}</td>
                                   <td>{playerStatsMap[player.id].total.highScore}pt</td>
                                   <td>{playerStatsMap[player.id].total.gameCount}</td>
                                 </tr>
@@ -308,7 +318,7 @@ export default function Player() {
                                   <tr key={y.year}>
                                     <th scope="row">{y.year}年</th>
                                     <td>{y.totalPoint > 0 ? `+${y.totalPoint}pt` : `${y.totalPoint}pt`}</td>
-                                    <td>{(y.avoidFourthRate * 100).toFixed(1)}%</td>
+                                    <td>{y.avoidFourthRate?.toFixed(3)}</td>
                                     <td>{y.highScore}pt</td>
                                     <td>{y.gameCount}</td>
                                   </tr>
@@ -481,7 +491,7 @@ export default function Player() {
                         </label>
 
                         <div style={{ fontSize: "1.2rem", color: "#777", lineHeight: 1.5 }}>
-                          ファイル形式: JPG, PNG, GIF, WEBP / 保存名: player_{editingPlayer.id} + 元の拡張子
+                          ファイル形式: JPG, PNG, GIF, WEBP
                         </div>
 
                         {selectedIconFile && (
@@ -515,18 +525,13 @@ export default function Player() {
                       >
                         <button
                           type="button"
-                          onClick={closeEditor}
-                          disabled={isSaving}
+                          className="c-button -primary -medium"
                           style={{
                             ...modalActionButtonStyle,
-                            border: "1px solid #c7c7c7",
-                            borderRadius: "999px",
-                            background: "#fff",
-                            color: "#333",
-                            fontSize: "1.4rem",
-                            cursor: isSaving ? "default" : "pointer",
-                            opacity: isSaving ? 0.7 : 1,
+                            opacity: isSaving ? 0.8 : 1,
                           }}
+                          onClick={closeEditor}
+                          disabled={isSaving}
                         >
                           キャンセル
                         </button>

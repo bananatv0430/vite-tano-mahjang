@@ -16,13 +16,7 @@ export const getPlayerImageSrc = (iconPath, name, iconVersion) => {
   if (!iconPath) {
     return createAvatar(name);
   }
-
-  if (iconVersion == null) {
-    return iconPath;
-  }
-
-  const separator = String(iconPath).includes("?") ? "&" : "?";
-  return `${iconPath}${separator}v=${iconVersion || 1}`;
+  return iconPath;
 };
 
 export const formatPoint = (value) => `${value < 0 ? "▲" : ""}${Math.abs(Number(value) || 0).toFixed(1)}pt`;
@@ -92,14 +86,12 @@ export const normalizePlayer = (player) => {
   const id = String(player.id ?? "");
   const name = String(player.name ?? "未設定");
   const iconPath = player.icon_path ?? player.iconPath ?? "";
-  const iconVersion = Number(player.icon_version ?? player.iconVersion ?? 1);
 
   return {
     id,
     name,
     iconPath,
-    iconVersion,
-    avatar: getPlayerImageSrc(iconPath, name, iconVersion),
+    avatar: getPlayerImageSrc(iconPath, name),
   };
 };
 

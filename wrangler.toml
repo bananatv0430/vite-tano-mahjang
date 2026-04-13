@@ -15,6 +15,11 @@ database_id = "311b9b68-d869-4365-b098-0bb998609041"
 # ======== 変数 ========
 [vars]
 ACCOUNT_ID = "73a47c4101e20fefb35d17c47ddfa83c"
+R2_PUBLIC_BASE = "https://<あなたのサブドメイン>.r2.dev"
+
+[[r2_buckets]]
+binding = "R2_BUCKET"         # コード内で使うバインディング名
+bucket_name = "players-icon" # R2バケット名
 
 
 # ======== ローカルで wrangler dev を動かす設定 ========
