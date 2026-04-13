@@ -1,4 +1,4 @@
-name = "tanomahjang-backend"
+name = "vite-tano-mahjang"
 main = "backend/workers/worker.js"
 compatibility_date = "2024-01-01"
 
