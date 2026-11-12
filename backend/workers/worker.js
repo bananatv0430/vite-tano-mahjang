@@ -17,29 +17,55 @@ router.mount('/api/rankings', rankingsRoutes);
 router.mount('/api/logs', logsRoutes);
 router.mount('/api/rules', rulesRoutes);
 
+// CORSヘッダー
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type"
+};
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
-    // ======== R2画像配信（キャッシュ戦略） ========
+    // ======== CORS ========
+    if (request.method === "OPTIONS") {
+      return new Response(null, { headers: corsHeaders });
+    }
+
+    // ======== R2画像 ========
     if (url.pathname.startsWith("/r2/")) {
       const key = url.pathname.replace("/r2/", "");
-
       const object = await env.R2_BUCKET.get(key);
-
       if (!object || !object.body) {
-        return new Response("Not Found", { status: 404 });
+        return new Response("Not Found", { status: 404, headers: corsHeaders });
       }
-
       return new Response(object.body, {
         headers: {
+          ...corsHeaders,
           "Content-Type": object.httpMetadata?.contentType || "application/octet-stream",
           "Cache-Control": "public, max-age=31536000",
         },
       });
     }
 
-    // ======== 既存API ========
-    return router.handle(request, env, ctx);
+    // ======== API ========
+    if (url.pathname.startsWith("/api/")) {
+      const apiResponse = await router.handle(request, env, ctx);
+
+      const newHeaders = new Headers(apiResponse.headers);
+      Object.entries(corsHeaders).forEach(([k, v]) => newHeaders.set(k, v));
+
+      return new Response(apiResponse.body, {
+        status: apiResponse.status,
+        statusText: apiResponse.statusText,
+        headers: newHeaders,
+      });
+    }
+
+    // ======== SPA fallback（←これが重要） ========
+    return env.ASSETS.fetch(
+      new Request(new URL("/index.html", request.url))
+    );
   }
 };

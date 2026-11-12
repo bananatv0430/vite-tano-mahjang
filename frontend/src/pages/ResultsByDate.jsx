@@ -1,78 +1,28 @@
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLoadResultsByYear } from "../hooks/useLoadResultsByYear";
 import ResultsPreviewModal from "../components/ResultsPreviewModal";
-import { formatDisplayDate } from "../utils/gameUtils";
-import { getIconSrc } from "../utils/getIconSrc";
-
-
-// fallbackアイコン生成
-const createFallbackIcon = (name) => {
-  const firstChar = String(name ?? "?").slice(0, 1);
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
-      <rect width="120" height="120" rx="60" fill="#f4f4f4"/>
-      <circle cx="60" cy="45" r="22" fill="#f08300" opacity="0.92"/>
-      <path d="M24 104c6-22 20-33 36-33s30 11 36 33" fill="#f08300" opacity="0.86"/>
-      <text x="60" y="52" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#ffffff">${firstChar}</text>
-    </svg>
-  `;
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-};
-
-// 共通getIconSrcラッパー
-const getMainIconSrc = (iconPath, iconVersion, name, playerId) => {
-  if (playerId && [1,2,3,4,5].includes(Number(playerId))) {
-    return `/assets/media/players/player_${playerId}.png`;
-  }
-  return getIconSrc(iconPath, iconVersion, createFallbackIcon(name));
-};
+import ResultsPreviewStyles from "../components/ResultsPreviewStyles";
+import { calculateTotalStandings, formatDisplayDate } from "../utils/gameUtils";
+import { getRankingPlayerIconSrc } from "../utils/playerIcons";
+import { normalizePlayMode, normalizeResultParticipants, normalizeResultRounds, PLAY_MODE_FILTERS } from "../utils/resultDisplayUtils";
+import { useRoundPagination } from "../hooks/useRoundPagination";
+import { usePreviewViewport } from "../hooks/usePreviewViewport";
+import { useActivateMain } from "../hooks/useActivateMain";
+import "../previewAnimations.css";
 
 const normalizeMatchData = (dates = []) => dates.map((dateEntry) => {
-  const rounds = (dateEntry.games ?? []).map((game, index) => ({
-    id: game.gameId,
-    roundNumber: Number(game.matchNumber ?? index + 1),
-    ruleName: game.rule?.name || "未設定",
-    players: [...(game.players ?? [])]
-      .map((player) => ({
-        playerId: player.playerId,
-        name: player.name,
-        point: Number(player.finalPoint ?? 0),
-        finalScore: Number(player.finalScore ?? 0),
-        rank: Number(player.rank ?? 0),
-        avatar: getMainIconSrc(player.iconPath, player.iconVersion, player.name, player.playerId),
-      }))
-      .sort((a, b) => a.rank - b.rank),
-  }));
-
-  const totalMap = rounds.flatMap((round) => round.players).reduce((totals, player) => {
-    const key = String(player.playerId ?? player.name);
-
-    if (!totals[key]) {
-      totals[key] = {
-        ...player,
-        totalPoint: 0,
-      };
-    }
-
-    totals[key].totalPoint += player.point;
-    return totals;
-  }, {});
-
-  const participants = (dateEntry.participants ?? [])
-    .map((player) => ({
-      playerId: player.playerId,
-      name: player.name,
-      avatar: getMainIconSrc(player.iconPath, player.iconVersion, player.name, player.playerId),
-      totalPoint: totalMap[String(player.playerId ?? player.name)]?.totalPoint ?? 0,
-    }))
-    .sort((a, b) => b.totalPoint - a.totalPoint);
+	// 共通関数で半荘・参加者を整え、日付別画面に必要な点数項目を指定する。
+	const normalizedPlayMode = normalizePlayMode(dateEntry.playMode ?? dateEntry.games?.[0]?.playMode);
+	const rounds = normalizeResultRounds(dateEntry, { includeFinalScore: true, includeIconMetadata: true });
+	const participants = normalizeResultParticipants(dateEntry, rounds, { includeIconVersion: true });
 
   return {
     id: dateEntry.date,
     rawDate: dateEntry.date,
     date: formatDisplayDate(dateEntry.date),
     day: dateEntry.day || "",
+    playMode: normalizedPlayMode,
     participants,
     rounds,
   };
@@ -85,22 +35,18 @@ export default function ResultsByDate() {
     selectedYear,
     setSelectedYear,
     yearOptions,
-    resultsByYear,
-    displayedMatches,
     isLoading,
     loadError,
+    displayedMatches,
   } = useLoadResultsByYear(normalizeMatchData);
   const [selectedMatch, setSelectedMatch] = useState(null);
+  const [selectedPlayModeFilter, setSelectedPlayModeFilter] = useState("all");
   const [roundPageStart, setRoundPageStart] = useState(0);
   const [slideDirection, setSlideDirection] = useState("next");
-  const [isMobileView, setIsMobileView] = useState(() => (typeof window !== "undefined" ? window.innerWidth <= 767 : false));
+  const isMobileView = usePreviewViewport(selectedMatch, setSelectedMatch);
+  const [isSwitchingResults, setIsSwitchingResults] = useState(false);
 
-  useEffect(() => {
-    const main = mainRef.current;
-    if (main) {
-      main.classList.add("-active");
-    }
-  }, []);
+  useActivateMain(mainRef);
 
   // 年度切替時は選択中の試合・ページをリセット
   useEffect(() => {
@@ -108,253 +54,57 @@ export default function ResultsByDate() {
     setRoundPageStart(0);
   }, [selectedYear]);
 
-  useEffect(() => {
-    if (!selectedMatch) {
-      return undefined;
-    }
-
-    const handleKeyDown = (event) => {
-      if (event.key === "Escape") {
-        setSelectedMatch(null);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [selectedMatch]);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobileView(window.innerWidth <= 767);
-    };
-
-    handleResize();
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
-    };
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    const loadInitialResults = async () => {
-      setIsLoading(true);
-      setLoadError("");
-
-      try {
-        const response = await fetch("/api/results", { signal: controller.signal });
-
-        if (!response.ok) {
-          throw new Error("対戦履歴の取得に失敗しました");
-        }
-
-        const data = await response.json();
-        const years = (data.availableYears ?? []).map((item) => String(item.year));
-        const activeYear = String(data.year ?? years[0] ?? "");
-
-        setYearOptions(years);
-        if (activeYear) {
-          setResultsByYear((current) => ({
-            ...current,
-            [activeYear]: normalizeMatchData(data.dates ?? []),
-          }));
-          setSelectedYear((current) => current || activeYear);
-        }
-      } catch (error) {
-        if (error.name !== "AbortError") {
-          setLoadError(error.message || "対戦履歴の取得に失敗しました");
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    loadInitialResults();
-
-    return () => {
-      controller.abort();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!selectedYear || resultsByYear[selectedYear]) {
-      return undefined;
-    }
-
-    const controller = new AbortController();
-
-    const loadYearResults = async () => {
-      setIsLoading(true);
-      setLoadError("");
-
-      try {
-        const response = await fetch(`/api/results?year=${selectedYear}`, { signal: controller.signal });
-
-        if (!response.ok) {
-          throw new Error("対戦履歴の取得に失敗しました");
-        }
-
-        const data = await response.json();
-        setYearOptions((data.availableYears ?? []).map((item) => String(item.year)));
-        setResultsByYear((current) => ({
-          ...current,
-          [selectedYear]: normalizeMatchData(data.dates ?? []),
-        }));
-      } catch (error) {
-        if (error.name !== "AbortError") {
-          setLoadError(error.message || "対戦履歴の取得に失敗しました");
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    loadYearResults();
-
-    return () => {
-      controller.abort();
-    };
-  }, [selectedYear, resultsByYear]);
-
   // 表示用データはカスタムフックのdisplayedMatchesをそのまま利用
 
-  const matches = displayedMatches;
-  const roundsPerPage = isMobileView ? 1 : 2;
-  const pageCount = selectedMatch ? 1 + Math.ceil(selectedMatch.rounds.length / roundsPerPage) : 1;
-  const showTotalPage = roundPageStart === 0;
-  const roundSliceStart = showTotalPage ? 0 : (roundPageStart - 1) * roundsPerPage;
-  const visibleRounds = selectedMatch ? selectedMatch.rounds.slice(roundSliceStart, roundSliceStart + roundsPerPage) : [];
-  const hasRoundPager = pageCount > 1;
+  const matches = useMemo(() => (
+    selectedPlayModeFilter === "all"
+      ? displayedMatches
+      : displayedMatches.filter((match) => match.playMode === selectedPlayModeFilter)
+  ), [displayedMatches, selectedPlayModeFilter]);
+  const [stableMatches, setStableMatches] = useState([]);
 
   useEffect(() => {
-    setRoundPageStart((current) => Math.min(current, Math.max(pageCount - 1, 0)));
-  }, [pageCount]);
+    if (isSwitchingResults && !isLoading) {
+      setIsSwitchingResults(false);
+    }
+  }, [isSwitchingResults, isLoading, matches.length]);
 
-  const totalStandings = selectedMatch
-    ? Object.values(
-        selectedMatch.rounds.flatMap((round) => round.players).reduce((totals, player) => {
-          const key = String(player.playerId ?? player.name);
+  useEffect(() => {
+    if (isSwitchingResults && matches.length === 0) {
+      return;
+    }
+    setStableMatches(matches);
+  }, [isSwitchingResults, matches]);
 
-          if (!totals[key]) {
-            totals[key] = {
-              ...player,
-              totalPoint: 0,
-            };
-          }
+  const visibleMatches = isSwitchingResults && matches.length === 0 ? stableMatches : matches;
+  const resultsAreaMinHeight = isMobileView ? "460px" : "560px";
+  const {
+    roundsPerPage,
+    pageCount,
+    showTotalPage,
+    visibleRounds,
+    hasRoundPager,
+    handleRoundPageChange,
+  } = useRoundPagination({ selectedMatch, isMobileView, roundPageStart, setRoundPageStart, setSlideDirection });
 
-          totals[key].totalPoint += player.point;
-          return totals;
-        }, {})
-      )
-        .sort((a, b) => b.totalPoint - a.totalPoint)
-        .map((player, index) => ({
-          ...player,
-          totalRank: index + 1,
-        }))
-    : [];
-
-  const handleRoundPageChange = (direction) => {
-    setSlideDirection(direction);
-    setRoundPageStart((current) => {
-      if (!selectedMatch) {
-        return current;
-      }
-
-      if (direction === "prev") {
-        return Math.max(0, current - 1);
-      }
-
-      return Math.min(current + 1, pageCount - 1);
-    });
-  };
+  // 対局プレビューの順位点を共通の集計関数で算出する。
+  const totalStandings = selectedMatch ? calculateTotalStandings(selectedMatch.rounds) : [];
 
   return (
     <main ref={mainRef} className="l-main u-next-fill-gray p-loadAnimation" role="main">
+      <ResultsPreviewStyles />
       <style>{`
-        @keyframes resultSlideNext {
-          0% {
-            opacity: 0.88;
-            transform: translate3d(56px, 0, 0);
-          }
-          70% {
-            opacity: 1;
-            transform: translate3d(-4px, 0, 0);
-          }
-          100% {
-            opacity: 1;
-            transform: translate3d(0, 0, 0);
-          }
-        }
-
-        .resultsModal__contents {
-          position: fixed;
-          top: 54%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-          width: min(84vw, 700px);
-        }
-
         @media (max-width: 767px) {
-          .c-modal2__contents .p-gamesResult {
-            height: auto !important;
-            overflow: visible !important;
-            padding: 16px 12px 24px !important;
+          .p-gamesSchedule2__tab {
+            margin: 0 !important;
+            padding: 0 !important;
           }
-
-          .c-modal2__contents .p-gamesResult__date {
-            font-size: 2.8rem;
-            margin-bottom: 16px;
+          .p-gamesSchedule2__tab-list {
+            padding-top: 0 !important;
+            margin: 0 !important;
           }
-
-          .c-modal2__contents .p-gamesResult__dotw {
-            font-size: 1.6rem;
-          }
-
-          .c-modal2__contents .p-gamesResult__number {
-            margin-bottom: 12px;
-            font-size: 1.3rem;
-          }
-
-          .c-modal2__contents .p-gamesResult__rank-list > li:not(:last-child) {
-            margin-bottom: 12px;
-          }
-
-          .c-modal2__contents .p-gamesResult__thumbnail {
-            width: 72px;
-            height: 72px;
-          }
-
-          .c-modal2__contents .p-gamesResult__thumbnail-wrap {
-            margin-left: 10px;
-          }
-
-          .c-modal2__contents .p-gamesResult__button-wrap {
-            padding-top: 12px;
-            margin-bottom: 0;
-          }
-        }
-
-        @keyframes resultSlidePrev {
-          0% {
-            opacity: 0.88;
-            transform: translate3d(-56px, 0, 0);
-          }
-          70% {
-            opacity: 1;
-            transform: translate3d(4px, 0, 0);
-          }
-          100% {
-            opacity: 1;
-            transform: translate3d(0, 0, 0);
+          .p-gamesSchedule2__tab-item:nth-child(n+4) {
+            margin-top: 0 !important;
           }
         }
       `}</style>
@@ -370,7 +120,15 @@ export default function ResultsByDate() {
 
       <section className="p-gamesSchedule2" id="schedule">
         <div className="p-gamesSchedule2__inner">
-          <nav className="p-gamesSchedule2__tab">
+          <div style={isMobileView ? { display: "flex", flexDirection: "column", gap: "8px", paddingTop: "20px" } : {}}>
+          <nav
+            className="p-gamesSchedule2__tab"
+            style={{
+              marginBottom: isMobileView ? "0" : "-40px",
+              paddingBottom: "0",
+              paddingTop: "0",
+            }}
+          >
             <ul
               className="p-gamesSchedule2__tab-list"
               style={{
@@ -395,6 +153,9 @@ export default function ResultsByDate() {
                     aria-current={selectedYear === year ? "true" : undefined}
                     onClick={(event) => {
                       event.preventDefault();
+                      if (selectedYear !== year) {
+                        setIsSwitchingResults(true);
+                      }
                       setSelectedYear(year);
                     }}
                     style={{
@@ -414,27 +175,87 @@ export default function ResultsByDate() {
             </ul>
           </nav>
 
-          {loadError ? (
-            <p style={{ marginTop: "24px", textAlign: "center", color: "#c62828", fontWeight: 700 }}>
-              {loadError}
-            </p>
-          ) : isLoading && matches.length === 0 ? (
-            <p style={{ marginTop: "24px", textAlign: "center", color: "#666" }}>対戦履歴を読み込み中です...</p>
-          ) : matches.length === 0 ? (
-            <p style={{ marginTop: "24px", textAlign: "center", color: "#666" }}>表示できる対戦履歴はありません。</p>
-          ) : (
+          <nav
+            className="p-gamesSchedule2__tab"
+            style={{
+              marginTop: isMobileView ? "0" : "-10px",
+              paddingTop: "0",
+              paddingBottom: "0",
+              marginBottom: "0",
+            }}
+          >
             <ul
-              aria-current="true"
-              className="p-gamesSchedule2__lists p-gamesSchedule2__lists--mt"
+              className="p-gamesSchedule2__tab-list"
               style={{
-                display: "grid",
-                gridTemplateColumns: isMobileView ? "repeat(2, minmax(0, 1fr))" : "repeat(4, minmax(0, 1fr))",
-                gap: isMobileView ? "18px 12px" : "28px 16px",
-                margin: isMobileView ? "32px 0 0" : "70px 0 0",
-                padding: 0,
+                justifyContent: "center",
+                gap: isMobileView ? "8px" : "8px",
+                flexWrap: isMobileView ? "nowrap" : "wrap",
+                display: isMobileView ? "grid" : "flex",
+                gridTemplateColumns: isMobileView ? "repeat(3, minmax(0, 1fr))" : undefined,
+                width: "100%",
+                maxWidth: isMobileView ? "420px" : undefined,
+                margin: "0 auto",
               }}
             >
-              {matches.map((match) => {
+              {PLAY_MODE_FILTERS.map((mode) => {
+                const isActive = selectedPlayModeFilter === mode.key;
+
+                return (
+                  <li
+                    key={mode.key}
+                    className="p-gamesSchedule2__tab-item"
+                    style={{ width: isMobileView ? "100%" : "auto", margin: 0 }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedPlayModeFilter !== mode.key) {
+                          setIsSwitchingResults(true);
+                        }
+                        setSelectedPlayModeFilter(mode.key);
+                      }}
+                      style={{
+                        width: "100%",
+                        minWidth: isMobileView ? 0 : "96px",
+                        height: "36px",
+                        borderRadius: "999px",
+                        border: `1.5px solid ${isActive ? mode.style.activeBorderColor : mode.style.borderColor}`,
+                        cursor: "pointer",
+                        fontWeight: 700,
+                        opacity: isActive ? 1 : 0.55,
+                        boxShadow: isActive ? `inset 0 0 0 1px ${mode.style.activeBorderColor}` : "none",
+                        ...mode.style,
+                      }}
+                    >
+                      {mode.label}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+          </div>
+
+          <div style={{ minHeight: resultsAreaMinHeight }}>
+            {loadError ? (
+              <p style={{ marginTop: "24px", textAlign: "center", color: "#c62828", fontWeight: 700 }}>
+                {loadError}
+              </p>
+            ) : isLoading && visibleMatches.length === 0 ? null : visibleMatches.length === 0 ? (
+              <p style={{ marginTop: "24px", textAlign: "center", color: "#666" }}>表示できる対戦履歴はありません。</p>
+            ) : (
+              <ul
+                aria-current="true"
+                className="p-gamesSchedule2__lists p-gamesSchedule2__lists--mt"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: isMobileView ? "repeat(2, minmax(0, 1fr))" : "repeat(4, minmax(0, 1fr))",
+                  gap: isMobileView ? "18px 12px" : "28px 16px",
+                  margin: isMobileView ? "12px 0 0" : "28px 0 0",
+                  padding: 0,
+                }}
+              >
+                {visibleMatches.map((match) => {
                 const [month, day] = match.date.split("/");
                 const winningPlayerId = match.participants[0]?.playerId;
                 const tilePlayers = [...match.participants]
@@ -493,6 +314,20 @@ export default function ResultsByDate() {
                         {day}
                         <span className="p-gamesSchedule2__dayWeek">（{match.day}）</span>
                       </p>
+                      <p
+                        style={{
+                          margin: isMobileView ? "-8px 0 8px" : "-12px 0 10px",
+                          padding: "3px 10px",
+                          borderRadius: "999px",
+                          fontSize: "1.05rem",
+                          fontWeight: 700,
+                          background: match.playMode === "online" ? "#eaf8ee" : "#ffefef",
+                          color: match.playMode === "online" ? "#166534" : "#b42318",
+                          border: match.playMode === "online" ? "1.5px solid #2f8f57" : "1.5px solid #d92d20",
+                        }}
+                      >
+                        {match.playMode === "online" ? "オンライン" : "オフライン"}
+                      </p>
                       <ul
                         className="p-gamesSchedule2__logos"
                         style={{
@@ -513,7 +348,7 @@ export default function ResultsByDate() {
                             <li key={`${match.id}-${player.playerId}`} style={{ display: "flex", justifyContent: "center" }}>
                               <img
                                 alt={player.name}
-                                src={player.avatar}
+                                src={getRankingPlayerIconSrc(player.iconPath, player.iconVersion, player.name)}
                                 style={{
                                   width: isMobileView ? "52px" : "60px",
                                   height: isMobileView ? "52px" : "60px",
@@ -532,9 +367,10 @@ export default function ResultsByDate() {
                     </a>
                   </li>
                 );
-              })}
-            </ul>
-          )}
+                })}
+              </ul>
+            )}
+          </div>
         </div>
 
         <ResultsPreviewModal

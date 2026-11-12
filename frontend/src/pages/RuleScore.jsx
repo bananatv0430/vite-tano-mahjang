@@ -1,32 +1,21 @@
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import styles from "./ScoreTable/ScoreTable.module.css";
 import LowScoreTable from "./ScoreTable/components/LowScoreTable";
-import LowScoreTableParentWithFu from "./ScoreTable/components/LowScoreTableParentWithFu";
+import LowScoreTableParent from "./ScoreTable/components/LowScoreTableParent";
 import LowScoreTableChild from "./ScoreTable/components/LowScoreTableChild";
 import HighScoreTable from "./ScoreTable/components/HighScoreTable";
 import FuGuide from "./ScoreTable/components/FuGuide";
+import { useActivateMain } from "../hooks/useActivateMain";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 
 export default function RuleScore() {
   const [showFuGuide, setShowFuGuide] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-  const isWip = true; // ← falseで表、trueで全て「実装中」表示
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth <= 600);
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
+  const isMobile = useMediaQuery("(max-width: 600px)");
+  const isWip = false; // ← falseで表、trueで全て「実装中」表示
 
     const mainRef = useRef(null);
-  
-    useEffect(() => {
-      const main = mainRef.current;
-      if (main) {
-        main.classList.add("-active");
-      }
-    }, []);
+    useActivateMain(mainRef);
 
   return (
     <main ref={mainRef} className="l-main p-loadAnimation" role="main" style={{ paddingBottom: 64 }}>
@@ -69,7 +58,7 @@ export default function RuleScore() {
                 <div style={{textAlign: 'center', fontSize: 20, fontWeight: 'bold', margin: '32px 0'}}>実装中</div>
               ) : isMobile ? (
                 <>
-                  <LowScoreTableParentWithFu />
+                  <LowScoreTableParent />
                   <div style={{ height: 16 }} />
                   <LowScoreTableChild />
                   <div style={{ height: 16 }} />
@@ -77,9 +66,19 @@ export default function RuleScore() {
                 </>
               ) : (
                 <>
-                  <LowScoreTable />
-                  <div style={{ width: '100%', maxWidth: 900, margin: '24px auto', borderTop: '2px solid #bbb' }} />
-                  <HighScoreTable />
+                  <div className={styles.desktopScoreTable}>
+                    <LowScoreTable />
+                    <div style={{ width: '100%', maxWidth: 900, margin: '24px auto', borderTop: '2px solid #bbb' }} />
+                    <HighScoreTable />
+                  </div>
+
+                  <div className={styles.mobileScoreTables}>
+                    <LowScoreTableParent />
+                    <div style={{ height: 16 }} />
+                    <LowScoreTableChild />
+                    <div style={{ height: 16 }} />
+                    <HighScoreTable />
+                  </div>
                 </>
               )}
             </div>

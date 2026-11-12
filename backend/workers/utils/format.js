@@ -1,4 +1,26 @@
+/** Worker APIで共有する値の整形とJSONレスポンス生成処理。 */
 export const format = {
+  /**
+   * 日付文字列から日本語の曜日を取得
+   */
+  weekday(value) {
+    const date = new Date(String(value ?? "") + "T00:00:00");
+    if (Number.isNaN(date.getTime())) return "";
+    return ["日", "月", "火", "水", "木", "金", "土"][date.getDay()];
+  },
+
+  /**
+   * 対局モードを正規化
+   */
+  playMode(value) {
+    return String(value ?? "").toLowerCase() === "online" ? "online" : "offline";
+  },
+
+  /** 対局日として使うYYYY-MM-DD形式かを確認する。 */
+  isDate(value) {
+    return /^\d{4}-\d{2}-\d{2}$/.test(String(value ?? ""));
+  },
+
   /**
    * 日付（YYYY-MM-DD）へ変換
    * 不正な値は null

@@ -249,32 +249,75 @@ routes.push({
 routes.push({
   method: "GET",
   path: "/summary",
-  handler: async ({ env }) => {
+  handler: async ({ env, query }) => {
     try {
-      const rows = await db.queryAll(env, `
-        SELECT
-          p.id AS playerId,
-          p.name,
-          p.icon_path AS iconPath,
-          COUNT(gr.id) AS gameCount,
-          ROUND(COALESCE(SUM(gr.final_point), 0), 1) AS totalPoint,
-          MAX(gr.final_score) AS highScore,
-          SUM(CASE WHEN gr.rank = 1 THEN 1 ELSE 0 END) AS topCount,
-          ROUND(CASE WHEN COUNT(gr.id) = 0 THEN 0 ELSE SUM(CASE WHEN gr.rank <> 4 THEN 1.0 ELSE 0 END) / COUNT(gr.id) END, 4) AS avoidFourthRate
-        FROM players p
-        LEFT JOIN game_results gr ON gr.player_id = p.id
-        GROUP BY p.id, p.name, p.icon_path
-        HAVING COUNT(gr.id) > 0
-      `);
-      const createRanking = (selector) => rows
-        .map((row) => ({
-          playerId: row.playerId,
-          name: row.name,
-          iconPath: row.iconPath,
-          value: selector(row),
-        }))
-        .sort((a, b) => b.value - a.value || a.playerId - b.playerId)
-        .slice(0, 6);
+      const playMode = query?.get("play_mode") ?? "all";
+      const validModes = ["online", "offline"];
+      const filterMode = validModes.includes(playMode) ? playMode : null;
+
+      let rows;
+      if (filterMode) {
+        // フィルター時: 全試合参加済みの選手を返す（対象modeの試合がない選手はgameCount=0）
+        rows = await db.queryAll(env, `
+          SELECT
+            p.id AS playerId,
+            p.name,
+            p.icon_path AS iconPath,
+            COUNT(fg.id) AS gameCount,
+            ROUND(COALESCE(SUM(fg.final_point), 0), 1) AS totalPoint,
+            COALESCE(MAX(fg.final_score), 0) AS highScore,
+            COALESCE(SUM(CASE WHEN fg.rank = 1 THEN 1 ELSE 0 END), 0) AS topCount,
+            ROUND(CASE WHEN COUNT(fg.id) = 0 THEN 0 ELSE SUM(CASE WHEN fg.rank <> 4 THEN 1.0 ELSE 0 END) / COUNT(fg.id) END, 4) AS avoidFourthRate
+          FROM players p
+          LEFT JOIN (
+            SELECT gr.id, gr.player_id, gr.final_point, gr.final_score, gr.rank
+            FROM game_results gr
+            INNER JOIN games g ON g.id = gr.game_id AND g.play_mode = '${filterMode}'
+          ) fg ON fg.player_id = p.id
+          WHERE EXISTS (SELECT 1 FROM game_results WHERE player_id = p.id)
+          GROUP BY p.id, p.name, p.icon_path
+        `);
+      } else {
+        rows = await db.queryAll(env, `
+          SELECT
+            p.id AS playerId,
+            p.name,
+            p.icon_path AS iconPath,
+            COUNT(gr.id) AS gameCount,
+            ROUND(COALESCE(SUM(gr.final_point), 0), 1) AS totalPoint,
+            MAX(gr.final_score) AS highScore,
+            SUM(CASE WHEN gr.rank = 1 THEN 1 ELSE 0 END) AS topCount,
+            ROUND(CASE WHEN COUNT(gr.id) = 0 THEN 0 ELSE SUM(CASE WHEN gr.rank <> 4 THEN 1.0 ELSE 0 END) / COUNT(gr.id) END, 4) AS avoidFourthRate
+          FROM players p
+          LEFT JOIN game_results gr ON gr.player_id = p.id
+          GROUP BY p.id, p.name, p.icon_path
+          HAVING COUNT(gr.id) > 0
+        `);
+      }
+
+      const createRanking = (selector) => {
+        const ranked = [];
+        const unranked = [];
+        for (const row of rows) {
+          const count = Number(row.gameCount ?? 0);
+          const entry = {
+            playerId: row.playerId,
+            name: row.name,
+            iconPath: row.iconPath,
+            gameCount: count,
+            value: count > 0 ? selector(row) : null,
+          };
+          if (count > 0) {
+            ranked.push(entry);
+          } else {
+            unranked.push(entry);
+          }
+        }
+        ranked.sort((a, b) => b.value - a.value || a.playerId - b.playerId);
+        unranked.sort((a, b) => a.playerId - b.playerId);
+        return [...ranked, ...unranked].slice(0, 6);
+      };
+
       const rankings = {
         personalScore: createRanking((row) => Number(row.totalPoint ?? 0)),
         highScore: createRanking((row) => Number(row.highScore ?? 0)),

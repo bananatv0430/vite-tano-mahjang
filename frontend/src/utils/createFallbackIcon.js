@@ -1,4 +1,4 @@
-// fallbackアイコン生成
+// プレイヤー画像がない場合に表示する共通の代替アイコンを生成する。
 export const createFallbackIcon = (name) => {
   const firstChar = String(name ?? "?").slice(0, 1);
   const svg = `

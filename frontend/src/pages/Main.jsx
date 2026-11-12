@@ -1,90 +1,42 @@
-import React, { useEffect, useState } from "react";
-import { useLoadRankings, useLoadRecentMatches } from "../hooks/useLoadMainData";
+import React, { useState } from "react";
+import { useLoadRankings } from "../hooks/useLoadRankings";
+import { useLoadRecentMatches } from "../hooks/useLoadRecentMatches";
 import { Link } from "react-router-dom";
 import ResultsPreviewModal from "../components/ResultsPreviewModal";
+import ResultsPreviewStyles from "../components/ResultsPreviewStyles";
 
-const createFallbackIcon = (name) => {
-	const firstChar = String(name ?? "?").slice(0, 1);
-	const svg = `
-		<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
-			<rect width="120" height="120" rx="60" fill="#f4f4f4"/>
-			<circle cx="60" cy="45" r="22" fill="#f08300" opacity="0.92"/>
-			<path d="M24 104c6-22 20-33 36-33s30 11 36 33" fill="#f08300" opacity="0.86"/>
-			<text x="60" y="52" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#ffffff">${firstChar}</text>
-		</svg>
-	`;
-
-	return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-};
-
-
-import { getIconSrc } from "../utils/getIconSrc";
-
-// ローカル画像優先＋共通getIconSrcラッパー
-const getMainIconSrc = (iconPath, iconVersion, name, playerId) => {
-	if (playerId && [1,2,3,4,5].includes(Number(playerId))) {
-		return `/assets/media/players/player_${playerId}.png`;
-	}
-	return getIconSrc(iconPath, iconVersion, createFallbackIcon(name));
-};
+import { calculateTotalStandings, formatNumber, getDisplayDateParts } from "../utils/gameUtils";
+import { getRankingPlayerIconSrc } from "../utils/playerIcons";
+import { normalizePlayMode, normalizeResultParticipants, normalizeResultRounds, PLAY_MODE_FILTERS } from "../utils/resultDisplayUtils";
+import { useRoundPagination } from "../hooks/useRoundPagination";
+import { usePreviewViewport } from "../hooks/usePreviewViewport";
+import "../previewAnimations.css";
 
 const rankingConfigs = [
 	{ key: "personalScore", title: "個人スコア", valueLabel: "pt", formatter: (value) => Number(value ?? 0).toFixed(1) },
-	{ key: "highScore", title: "最高スコア", valueLabel: "点", formatter: (value) => Number(value ?? 0).toLocaleString("ja-JP") },
+	{ key: "highScore", title: "最高スコア", valueLabel: "点", formatter: formatNumber },
 	{ key: "avoidFourthRate", title: "4着回避率", valueLabel: "", formatter: (value) => Number(value ?? 0).toFixed(4) },
 	{ key: "topCount", title: "最多トップ", valueLabel: "回数", formatter: (value) => `${Number(value ?? 0)}` },
 ];
 
 const formatRecentDate = (dateValue) => {
-	const [year, month, day] = String(dateValue ?? "").split("-");
-	if (!year || !month || !day) {
+	const parts = getDisplayDateParts(dateValue);
+	if (!parts) {
 		return { month: "-", day: "-" };
 	}
 
 	return {
-		year: year,
-		month: String(Number(month)),
-		day: String(Number(day)),
+		year: parts.year,
+		month: parts.month,
+		day: parts.day,
 	};
 };
 
 const normalizeRecentMatches = (dates = []) => dates.slice(0, 5).map((dateEntry) => {
-	const rounds = (dateEntry.games ?? []).map((game, index) => ({
-		id: game.gameId ?? `${dateEntry.date}-${index}`,
-		roundNumber: Number(game.matchNumber ?? index + 1),
-		ruleName: game.rule?.name || "未設定",
-		players: [...(game.players ?? [])]
-			.map((player) => ({
-				playerId: player.playerId,
-				name: player.name,
-				avatar: getMainIconSrc(player.iconPath, player.iconVersion, player.name, player.playerId),
-				point: Number(player.finalPoint ?? 0),
-				rank: Number(player.rank ?? 0),
-			}))
-			.sort((a, b) => a.rank - b.rank),
-	}));
-
-	const totals = rounds.flatMap((round) => round.players).reduce((map, player) => {
-		const key = String(player.playerId ?? player.name);
-		if (!map[key]) {
-			map[key] = {
-				...player,
-				totalPoint: 0,
-			};
-		}
-		map[key].totalPoint += player.point;
-		return map;
-	}, {});
-
-	const participants = [...(dateEntry.participants ?? [])]
-		.map((player) => ({
-			playerId: player.playerId,
-			name: player.name,
-			iconPath: player.iconPath,
-			avatar: getMainIconSrc(player.iconPath, player.iconVersion, player.name, player.playerId),
-			totalPoint: totals[String(player.playerId ?? player.name)]?.totalPoint ?? 0,
-		}))
-		.sort((a, b) => Number(a.playerId ?? 0) - Number(b.playerId ?? 0));
+	// 共通関数で半荘・参加者を整え、トップ画面固有の日付情報を追加する。
+	const normalizedPlayMode = normalizePlayMode(dateEntry.playMode ?? dateEntry.games?.[0]?.playMode);
+	const rounds = normalizeResultRounds(dateEntry, { fallbackRoundId: true });
+	const participants = normalizeResultParticipants(dateEntry, rounds, { order: "playerId" });
 
 	const winningPlayerId = [...participants].sort((a, b) => b.totalPoint - a.totalPoint)[0]?.playerId;
 	const displayDate = formatRecentDate(dateEntry.date);
@@ -97,6 +49,7 @@ const normalizeRecentMatches = (dates = []) => dates.slice(0, 5).map((dateEntry)
 		month: displayDate.month,
 		day: displayDate.day,
 		dayText: dateEntry.dayText || "",
+		playMode: normalizedPlayMode,
 		participants,
 		winningPlayerId,
 		rounds,
@@ -105,170 +58,31 @@ const normalizeRecentMatches = (dates = []) => dates.slice(0, 5).map((dateEntry)
 
 const Main = () => {
 	// カスタムフックでランキング・直近対戦履歴を取得
-	const { rankings, isLoadingRankings, rankingError } = useLoadRankings();
+	const [selectedRankingFilter, setSelectedRankingFilter] = useState("all");
+	const { rankings, isLoadingRankings, rankingError } = useLoadRankings(selectedRankingFilter);
 	const { recentMatches, isLoadingRecentMatches, recentMatchesError } = useLoadRecentMatches(normalizeRecentMatches);
 	const [selectedMatch, setSelectedMatch] = useState(null);
 	const [roundPageStart, setRoundPageStart] = useState(0);
 	const [slideDirection, setSlideDirection] = useState("next");
-	const [isMobileView, setIsMobileView] = useState(() => (typeof window !== "undefined" ? window.innerWidth <= 767 : false));
-
-	useEffect(() => {
-		const handleResize = () => {
-			setIsMobileView(window.innerWidth <= 767);
-		};
-
-		handleResize();
-		window.addEventListener("resize", handleResize);
-
-		return () => window.removeEventListener("resize", handleResize);
-	}, []);
-
-	useEffect(() => {
-		if (!selectedMatch) {
-			return undefined;
-		}
-
-		const handleKeyDown = (event) => {
-			if (event.key === "Escape") {
-				setSelectedMatch(null);
-			}
-		};
-
-		window.addEventListener("keydown", handleKeyDown);
-		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, [selectedMatch]);
+	const isMobileView = usePreviewViewport(selectedMatch, setSelectedMatch);
+	const rankingAreaMinHeight = isMobileView ? "520px" : "620px";
 
 
-	const roundsPerPage = isMobileView ? 1 : 2;
-	const pageCount = selectedMatch ? 1 + Math.ceil(selectedMatch.rounds.length / roundsPerPage) : 1;
-	const showTotalPage = roundPageStart === 0;
-	const roundSliceStart = showTotalPage ? 0 : (roundPageStart - 1) * roundsPerPage;
-	const visibleRounds = selectedMatch ? selectedMatch.rounds.slice(roundSliceStart, roundSliceStart + roundsPerPage) : [];
-	const hasRoundPager = pageCount > 1;
+	const {
+		roundsPerPage,
+		pageCount,
+		showTotalPage,
+		visibleRounds,
+		hasRoundPager,
+		handleRoundPageChange,
+	} = useRoundPagination({ selectedMatch, isMobileView, roundPageStart, setRoundPageStart, setSlideDirection });
 
-	useEffect(() => {
-		setRoundPageStart((current) => Math.min(current, Math.max(pageCount - 1, 0)));
-	}, [pageCount]);
-
-	const totalStandings = selectedMatch
-		? Object.values(
-				selectedMatch.rounds.flatMap((round) => round.players).reduce((totals, player) => {
-					const key = String(player.playerId ?? player.name);
-
-					if (!totals[key]) {
-						totals[key] = {
-							...player,
-							totalPoint: 0,
-						};
-					}
-
-					totals[key].totalPoint += player.point;
-					return totals;
-				}, {})
-			)
-				.sort((a, b) => b.totalPoint - a.totalPoint)
-				.map((player, index) => ({
-					...player,
-					totalRank: index + 1,
-				}))
-		: [];
-
-	const handleRoundPageChange = (direction) => {
-		setSlideDirection(direction);
-		setRoundPageStart((current) => {
-			if (!selectedMatch) {
-				return current;
-			}
-
-			if (direction === "prev") {
-				return Math.max(0, current - 1);
-			}
-
-			return Math.min(current + 1, pageCount - 1);
-		});
-	};
+	// プレビューの総合順位も日付別結果画面と同じ計算を使う。
+	const totalStandings = selectedMatch ? calculateTotalStandings(selectedMatch.rounds) : [];
 
 	return (
 		<main className="l-main p-loadAnimation" role="main">
-			<style>{`
-				@keyframes resultSlideNext {
-					0% {
-						opacity: 0.88;
-						transform: translate3d(56px, 0, 0);
-					}
-					70% {
-						opacity: 1;
-						transform: translate3d(-4px, 0, 0);
-					}
-					100% {
-						opacity: 1;
-						transform: translate3d(0, 0, 0);
-					}
-				}
-
-				@keyframes resultSlidePrev {
-					0% {
-						opacity: 0.88;
-						transform: translate3d(-56px, 0, 0);
-					}
-					70% {
-						opacity: 1;
-						transform: translate3d(4px, 0, 0);
-					}
-					100% {
-						opacity: 1;
-						transform: translate3d(0, 0, 0);
-					}
-				}
-
-				.resultsModal__contents {
-					position: fixed;
-					top: 54%;
-					left: 50%;
-					transform: translate(-50%, -50%);
-					width: min(84vw, 700px);
-				}
-
-				@media (max-width: 767px) {
-					.c-modal2__contents .p-gamesResult {
-						height: auto !important;
-						overflow: visible !important;
-						padding: 16px 12px 24px !important;
-					}
-
-					.c-modal2__contents .p-gamesResult__date {
-						font-size: 2.8rem;
-						margin-bottom: 16px;
-					}
-
-					.c-modal2__contents .p-gamesResult__dotw {
-						font-size: 1.6rem;
-					}
-
-					.c-modal2__contents .p-gamesResult__number {
-						margin-bottom: 12px;
-						font-size: 1.3rem;
-					}
-
-					.c-modal2__contents .p-gamesResult__rank-list > li:not(:last-child) {
-						margin-bottom: 12px;
-					}
-
-					.c-modal2__contents .p-gamesResult__thumbnail {
-						width: 72px;
-						height: 72px;
-					}
-
-					.c-modal2__contents .p-gamesResult__thumbnail-wrap {
-						margin-left: 10px;
-					}
-
-					.c-modal2__contents .p-gamesResult__button-wrap {
-						padding-top: 12px;
-						margin-bottom: 0;
-					}
-				}
-			`}</style>
+			<ResultsPreviewStyles />
 <section className="p-topAbout ">
 <div className="p-topAbout__inner">
 <h2 className="c-title -initial">
@@ -292,7 +106,33 @@ const Main = () => {
 				<span lang="en">ranking</span>
 				<span>ランキング</span>
 			</h2>
-<div className="p-ranking__personal-container">
+			<div style={{ display: "flex", justifyContent: "center", gap: "8px", marginTop: "16px", flexWrap: "wrap" }}>
+				{PLAY_MODE_FILTERS.map((mode) => {
+					const isActive = selectedRankingFilter === mode.key;
+					return (
+						<button
+							key={mode.key}
+							type="button"
+							onClick={() => setSelectedRankingFilter(mode.key)}
+							style={{
+								minWidth: "96px",
+								height: "36px",
+								borderRadius: "999px",
+								border: `1.5px solid ${isActive ? mode.style.activeBorderColor : mode.style.borderColor}`,
+								cursor: "pointer",
+								fontWeight: 700,
+								fontSize: "1.3rem",
+								opacity: isActive ? 1 : 0.55,
+								boxShadow: isActive ? `inset 0 0 0 1px ${mode.style.activeBorderColor}` : "none",
+								...mode.style,
+							}}
+						>
+							{mode.label}
+						</button>
+					);
+				})}
+			</div>
+			<div className="p-ranking__personal-container" style={{ minHeight: rankingAreaMinHeight }}>
 {rankingError ? (
 	<p style={{ marginBottom: "16px", textAlign: "center", color: "#c62828", fontWeight: 700 }}>
 		{rankingError}
@@ -317,40 +157,48 @@ const Main = () => {
 					</tr>
 				</thead>
 				<tbody>
-					{isLoadingRankings ? (
+							{isLoadingRankings ? (
 						<tr className="is-firstView">
 							<td colSpan="3" style={{ padding: "20px 12px", textAlign: "center", color: "#666" }}>
 								読み込み中...
 							</td>
 						</tr>
-					) : items.length === 0 ? (
+							) : items.filter((item) => Number(item.gameCount ?? 0) > 0).length === 0 ? (
 						<tr className="is-firstView">
 							<td colSpan="3" style={{ padding: "20px 12px", textAlign: "center", color: "#666" }}>
 								データなし
 							</td>
 						</tr>
 					) : (
-						items.map((item, index) => {
-							const rank = index + 1;
-							const rankClass = `is-${Math.min(rank, 6)}`;
+						(() => {
+							let rankCounter = 0;
+										const visibleItems = items.filter((item) => Number(item.gameCount ?? 0) > 0);
+										return visibleItems.map((item) => {
+											rankCounter++;
+											const rank = rankCounter;
+								const rankClass = rank ? `is-${Math.min(rank, 6)}` : "";
 
-							return (
-								<tr key={`${config.key}-${item.playerId}`} className={`${rank === 1 ? "is-rank1 " : ""}is-firstView`}>
-									<td>
-										<div className={`p-ranking__personal-number ${rankClass}`}>{rank}</div>
-									</td>
-									<td className="p-ranking__personal-wrap">
-										<div className="p-ranking__personal-thumbnail">
-											<img alt={item.name} src={getMainIconSrc(item.iconPath, item.iconVersion, item.name, item.playerId)} />
-										</div>
-										<div className={`p-ranking__personal-name ${rankClass}`}>{item.name}</div>
-									</td>
-									<td className={`p-ranking__personal-point ${rankClass}`}>
-										{config.formatter(item.value)}
-									</td>
-								</tr>
-							);
-						})
+								return (
+									<tr key={`${config.key}-${item.playerId}`} className={`${rank === 1 ? "is-rank1 " : ""}is-firstView`}>
+										<td>
+													<div className={`p-ranking__personal-number ${rankClass}`}>{rank}</div>
+										</td>
+										<td className="p-ranking__personal-wrap">
+											<div className="p-ranking__personal-thumbnail">
+																							{(() => {
+																								const src = getRankingPlayerIconSrc(item.iconPath, item.iconVersion, item.name);
+																								return <img alt={item.name} src={src} />;
+																							})()}
+											</div>
+													<div className={`p-ranking__personal-name ${rankClass}`}>{item.name}</div>
+										</td>
+												<td className={`p-ranking__personal-point ${rankClass}`}>
+													{config.formatter(item.value)}
+										</td>
+									</tr>
+								);
+							});
+						})()
 					)}
 				</tbody>
 			</table>
@@ -406,7 +254,30 @@ const Main = () => {
 								{match.month}
 								<span className="c-schedule__date-slash">/</span>
 								{match.day}
-								<span className="c-schedule__date-brackets">（{match.dayText}）</span>
+												<span className="c-schedule__date-brackets" style={{ display: "inline-flex", alignItems: "center", gap: 0 }}>
+											<span>（{match.dayText}）</span>
+													<span
+														role="img"
+														aria-label={match.playMode === "online" ? "オンライン" : "オフライン"}
+														style={{
+															display: "block",
+															width: "18px",
+															height: "18px",
+															flex: "none",
+															margin: 0,
+															transform: "scale(2.5)",
+															transformOrigin: "center",
+															backgroundColor: match.playMode === "online" ? "#22a55f" : "#d64545",
+															WebkitMaskImage: `url(${match.playMode === "online" ? "/assets/media/icons/online.png" : "/assets/media/icons/offline.png"})`,
+															maskImage: `url(${match.playMode === "online" ? "/assets/media/icons/online.png" : "/assets/media/icons/offline.png"})`,
+															WebkitMaskRepeat: "no-repeat",
+															maskRepeat: "no-repeat",
+															WebkitMaskPosition: "center",
+															maskPosition: "center",
+															WebkitMaskSize: "contain",
+															maskSize: "contain",
+														}} />
+										</span>
 							</span>
 						</p>
 					</div>

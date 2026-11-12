@@ -1,6 +1,7 @@
 import { db } from "../utils/db.js";
 import { format } from "../utils/format.js";
 import { rules } from "../utils/rules.js";
+import { groupResultRows } from "../utils/resultGroups.js";
 // GET /api/results/recent (Express互換)
 
 const routes = [];
@@ -96,6 +97,7 @@ routes.push({
           g.id AS game_id,
           g.date,
           g.match_number,
+          g.play_mode,
           u.id AS rule_id,
           u.name AS rule_name,
           u.oka,
@@ -116,61 +118,8 @@ routes.push({
         ORDER BY g.date DESC, g.match_number ASC, gr.rank ASC
       `, [requestedYear]);
 
-      // dateごとにグループ化し、games配列を持つ形式に変換
-      const dateMap = {};
-      for (const row of rows) {
-        if (!dateMap[row.date]) dateMap[row.date] = {};
-        const dateEntry = dateMap[row.date];
-        if (!dateEntry.games) dateEntry.games = {};
-        if (!dateEntry.games[row.game_id]) {
-          dateEntry.games[row.game_id] = {
-            gameId: row.game_id,
-            matchNumber: row.match_number,
-            rule: {
-              id: row.rule_id,
-              name: row.rule_name,
-              oka: row.oka,
-              uma1: row.uma1,
-              uma2: row.uma2,
-              startScore: row.start_score,
-            },
-            players: [],
-          };
-        }
-        dateEntry.games[row.game_id].players.push({
-          playerId: row.player_id,
-          name: row.player_name,
-          iconPath: row.icon_path,
-          rank: row.rank,
-          finalScore: row.final_score,
-          finalPoint: row.final_point,
-        });
-      }
-      // dateEntry.gamesを配列化
-      const dates = Object.entries(dateMap).map(([date, entry]) => {
-        // その日の全参加者を集計
-        const playerMap = {};
-        Object.values(entry.games).forEach(game => {
-          game.players.forEach(player => {
-            if (!playerMap[player.playerId]) {
-              playerMap[player.playerId] = {
-                playerId: player.playerId,
-                name: player.name,
-                iconPath: player.iconPath,
-              };
-            }
-          });
-        });
-        // 曜日をdateから算出
-        const day = ["日","月","火","水","木","金","土"][new Date(date+"T00:00:00").getDay()];
-        return {
-          date,
-          dayText: day,
-          day: day,
-          games: Object.values(entry.games).sort((a, b) => a.matchNumber - b.matchNumber),
-          participants: Object.values(playerMap),
-        };
-      }).sort((a, b) => b.date.localeCompare(a.date));
+      // 取得行を日付・半荘単位にまとめ、一覧表示用の形に整える。
+      const dates = groupResultRows(rows);
 
       // レスポンスをdata直下に展開する（data.dataの二重構造をやめる）
       return new Response(
@@ -211,7 +160,7 @@ routes.push({
       const rows = await db.queryAll(
         env,
         `
-        SELECT r.*, g.date, g.match_number, p.name, p.icon_path, u.id as rule_id, u.name as rule_name, u.oka, u.uma1, u.uma2, u.start_score
+        SELECT r.*, g.date, g.match_number, g.play_mode, p.name, p.icon_path, u.id as rule_id, u.name as rule_name, u.oka, u.uma1, u.uma2, u.start_score
         FROM game_results r
         JOIN games g ON g.id = r.game_id
         JOIN players p ON p.id = r.player_id
@@ -222,63 +171,8 @@ routes.push({
         recentDates
       );
 
-      // 日付ごとにグループ化
-      const dateMap = new Map();
-      for (const row of rows) {
-        if (!dateMap.has(row.date)) {
-          dateMap.set(row.date, {
-            date: row.date,
-            day: ["日","月","火","水","木","金","土"][new Date(row.date+"T00:00:00").getDay()],
-            games: [],
-            participants: [],
-          });
-        }
-        const dateEntry = dateMap.get(row.date);
-        let gameEntry = dateEntry.games.find(g => g.gameId === row.game_id);
-        if (!gameEntry) {
-          gameEntry = {
-            gameId: row.game_id,
-            matchNumber: row.match_number,
-            rule: {
-              id: row.rule_id,
-              name: row.rule_name,
-              oka: row.oka,
-              uma1: row.uma1,
-              uma2: row.uma2,
-              startScore: row.start_score,
-            },
-            players: [],
-          };
-          dateEntry.games.push(gameEntry);
-        }
-        const playerEntry = {
-          playerId: row.player_id,
-          name: row.name,
-          iconPath: row.icon_path,
-          rank: row.rank,
-          finalScore: row.final_score,
-          finalPoint: row.final_point,
-        };
-        gameEntry.players.push(playerEntry);
-        if (!dateEntry.participants.some(p => p.playerId === row.player_id)) {
-          dateEntry.participants.push({
-            playerId: row.player_id,
-            name: row.name,
-            iconPath: row.icon_path,
-          });
-        }
-      }
-      // 直近5日分のみ
-      const dates = Array.from(dateMap.values())
-        .sort((a, b) => b.date.localeCompare(a.date))
-        .slice(0, 5)
-        .map(entry => ({
-          date: entry.date,
-          dayText: entry.day, // 互換用
-          day: entry.day,     // normalizeMatchDataでmatch.dayとして参照されるため
-          participants: entry.participants,
-          games: entry.games,
-        }));
+      // 取得行を共通形式に変換し、直近5日分だけ返す。
+      const dates = groupResultRows(rows).slice(0, 5);
 
       return format.response(true, dates);
     } catch (e) {

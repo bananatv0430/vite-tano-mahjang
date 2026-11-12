@@ -1,14 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
+import { useActivateMain } from "../hooks/useActivateMain";
 
 export default function OtherNews() {
   const mainRef = useRef(null);
 
-  useEffect(() => {
-    const main = mainRef.current;
-    if (main) {
-      main.classList.add("-active");
-    }
-  }, []);
+  useActivateMain(mainRef);
 
   return (
     <main ref={mainRef} className="l-main p-loadAnimation" role="main">

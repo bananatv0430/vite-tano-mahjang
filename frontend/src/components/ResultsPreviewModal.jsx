@@ -19,6 +19,11 @@ export default function ResultsPreviewModal({
 
   const touchStartX = useRef(null);
   const touchEndX = useRef(null);
+  const playMode = String(selectedMatch?.playMode ?? "offline").toLowerCase() === "online" ? "online" : "offline";
+  const playModeLabel = playMode === "online" ? "オンライン" : "オフライン";
+  const playModeStyle = playMode === "online"
+    ? { background: "#eaf8ee", color: "#166534", border: "1.5px solid #2f8f57" }
+    : { background: "#ffefef", color: "#b42318", border: "1.5px solid #d92d20" };
 
   if (!selectedMatch) {
     return null;
@@ -67,12 +72,12 @@ export default function ResultsPreviewModal({
           </div>
           <div style={{ position: "relative", overflow: "hidden" }}>
             <div aria-hidden="true" style={{ visibility: "hidden", pointerEvents: "none" }}>
-              <div className="p-gamesResult__columns" style={{ width: "100%", justifyContent: "center" }}>
+              <div className="p-gamesResult__columns" style={{ width: "100%", justifyContent: "center", marginLeft: "-15px", marginRight: "-15px" }}>
                 {selectedMatch.rounds.slice(0, roundsPerPage).map((round, roundIndex) => {
                   const roundNumber = round.roundNumber ?? roundIndex + 1;
 
                   return (
-                    <div key={`${selectedMatch.id}-sizer-round-${roundNumber}`} className="p-gamesResult__column">
+                    <div key={`${selectedMatch.id}-sizer-round-${roundNumber}`} className="p-gamesResult__column" style={{ paddingLeft: "15px", paddingRight: "15px" }}>
                       <div className="p-gamesResult__number">第{roundNumber}回戦</div>
                       <div
                         style={{
@@ -96,7 +101,7 @@ export default function ResultsPreviewModal({
                                 </div>
                               </div>
                               <div className="p-gamesResult__name-wrap">
-                                <div className="p-gamesResult__name">{player.name}</div>
+                                <div className="p-gamesResult__name" style={{ whiteSpace: "nowrap" }}>{player.name}</div>
                                 <div className="p-gamesResult__point">{formatPoint(player.point)}</div>
                               </div>
                             </div>
@@ -127,6 +132,8 @@ export default function ResultsPreviewModal({
                     width: "100%",
                     justifyContent: "center",
                     animation: `${slideDirection === "next" ? "resultSlideNext" : "resultSlidePrev"} 320ms cubic-bezier(0.22, 1, 0.36, 1) both`,
+                    marginLeft: "-15px",
+                    marginRight: "-15px",
                   }}
                 >
                   <div
@@ -134,10 +141,36 @@ export default function ResultsPreviewModal({
                     style={{
                       width: "100%",
                       maxWidth: "420px",
+                      paddingLeft: "15px",
+                      paddingRight: "15px",
                       willChange: "transform, opacity",
                     }}
                   >
                     <div className="p-gamesResult__number">Total</div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "center",
+                        margin: "-4px 0 12px",
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          minWidth: "110px",
+                          padding: "4px 12px",
+                          borderRadius: "999px",
+                          fontSize: "1.1rem",
+                          fontWeight: 700,
+                          letterSpacing: "0.02em",
+                          ...playModeStyle,
+                        }}
+                      >
+                        {playModeLabel}
+                      </span>
+                    </div>
                     <ol className="p-gamesResult__rank-list">
                       {totalStandings.map((player) => (
                         <li key={`${selectedMatch.id}-total-${player.name}`}>
@@ -166,6 +199,8 @@ export default function ResultsPreviewModal({
                     width: "100%",
                     justifyContent: "center",
                     animation: `${slideDirection === "next" ? "resultSlideNext" : "resultSlidePrev"} 320ms cubic-bezier(0.22, 1, 0.36, 1) both`,
+                    marginLeft: "-15px",
+                    marginRight: "-15px",
                   }}
                 >
                   {visibleRounds.map((round, roundIndex) => {
@@ -175,7 +210,7 @@ export default function ResultsPreviewModal({
                       <div
                         key={`${selectedMatch.id}-round-${roundNumber}`}
                         className="p-gamesResult__column"
-                        style={{ willChange: "transform, opacity" }}
+                        style={{ paddingLeft: "15px", paddingRight: "15px", willChange: "transform, opacity" }}
                       >
                         <div className="p-gamesResult__number">第{roundNumber}回戦</div>
                         <div

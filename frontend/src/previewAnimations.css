@@ -1,0 +1,30 @@
+/* 対局結果プレビューのページ切替アニメーションを共通定義する。 */
+@keyframes resultSlideNext {
+  0% {
+    opacity: 0.88;
+    transform: translate3d(56px, 0, 0);
+  }
+  70% {
+    opacity: 1;
+    transform: translate3d(-4px, 0, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes resultSlidePrev {
+  0% {
+    opacity: 0.88;
+    transform: translate3d(-56px, 0, 0);
+  }
+  70% {
+    opacity: 1;
+    transform: translate3d(4px, 0, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}

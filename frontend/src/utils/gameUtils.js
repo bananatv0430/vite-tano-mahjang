@@ -22,14 +22,24 @@ export const getPlayerImageSrc = (iconPath, name, iconVersion) => {
 export const formatPoint = (value) => `${value < 0 ? "▲" : ""}${Math.abs(Number(value) || 0).toFixed(1)}pt`;
 export const formatRulePoint = (value) => `${value > 0 ? "+" : ""}${value}pt`;
 
-export const formatDisplayDate = (dateValue) => {
+/** YYYY-MM-DD形式の日付を画面表示用の年月日に分解する。 */
+export const getDisplayDateParts = (dateValue) => {
   const [year, month, day] = String(dateValue ?? "").split("-");
 
   if (!year || !month || !day) {
-    return String(dateValue ?? "");
+    return null;
   }
 
-  return `${Number(month)}/${Number(day)}`;
+  return {
+    year,
+    month: String(Number(month)),
+    day: String(Number(day)),
+  };
+};
+
+export const formatDisplayDate = (dateValue) => {
+  const parts = getDisplayDateParts(dateValue);
+  return parts ? `${parts.month}/${parts.day}` : String(dateValue ?? "");
 };
 
 export const getJapaneseWeekday = (dateValue) => {
@@ -85,7 +95,13 @@ export const FALLBACK_RULES = [
 export const normalizePlayer = (player) => {
   const id = String(player.id ?? "");
   const name = String(player.name ?? "未設定");
-  const iconPath = player.icon_path ?? player.iconPath ?? "";
+  // icon_path→iconPath変換を厳密に
+  let iconPath = "";
+  if (typeof player.icon_path === "string" && player.icon_path.length > 0) {
+    iconPath = player.icon_path;
+  } else if (typeof player.iconPath === "string" && player.iconPath.length > 0) {
+    iconPath = player.iconPath;
+  }
 
   return {
     id,
@@ -103,7 +119,7 @@ export const FALLBACK_PLAYERS = [
   { id: "5", name: "CPU" },
 ].map(normalizePlayer);
 
-export const SCORE_PICKER_VALUES = Array.from({ length: 1601 }, (_, index) => 150000 - index * 100);
+export const SCORE_PICKER_VALUES = Array.from({ length: 1501 }, (_, index) => 120000 - index * 100);
 export const SCORE_PICKER_SET = new Set(SCORE_PICKER_VALUES);
 
 export const buildAutoRanks = (players) => {
@@ -136,6 +152,18 @@ export const createRound = (roundNumber, players = FALLBACK_PLAYERS, startScore 
   ),
 });
 
+/** 対局開始時の4人を選択済み参加者で初期化した半荘データを作る。 */
+export const buildEntryRound = (roundNumber, players, startScore, selectedPlayerIds) => {
+  const round = createRound(roundNumber, players, startScore);
+  return {
+    ...round,
+    players: round.players.map((player, index) => ({
+      ...player,
+      playerId: selectedPlayerIds[index] ?? player.playerId,
+    })),
+  };
+};
+
 export const calculatePreviewPoint = (score, rank, rule) => {
   const numericScore = Number(score ?? 0);
   const rankIndex = Math.max(0, Number(rank || 1) - 1);
@@ -143,3 +171,18 @@ export const calculatePreviewPoint = (score, rank, rule) => {
 
   return (numericScore - Number(rule.returnPoint ?? 30000)) / 1000 + rankPoint;
 };
+
+/** 全半荘の得点をプレイヤー単位で合算する。 */
+export const aggregatePlayerPoints = (rounds) =>
+  rounds.flatMap((round) => round.players ?? []).reduce((totals, player) => {
+    const key = String(player.playerId ?? player.name);
+    if (!totals[key]) totals[key] = { ...player, totalPoint: 0 };
+    totals[key].totalPoint += Number(player.point ?? 0);
+    return totals;
+  }, {});
+
+/** 合計得点順に並べ、対局全体の順位を付ける。 */
+export const calculateTotalStandings = (rounds) =>
+  Object.values(aggregatePlayerPoints(rounds))
+    .sort((a, b) => b.totalPoint - a.totalPoint)
+    .map((player, index) => ({ ...player, totalRank: index + 1 }));

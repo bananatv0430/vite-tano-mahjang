@@ -2,6 +2,8 @@ import React from "react";
 import styles from "./ScoreTable.module.css";
 import { calcScoreFromFuHan } from "../../utils/calcScore";
 import FuGuide from "./components/FuGuide";
+import LowScoreTableParent from "./components/LowScoreTableParent";
+import LowScoreTableChild from "./components/LowScoreTableChild";
 import {
   fuList,
   parentHanList,
@@ -163,7 +165,15 @@ export default function ScoreTablePage() {
         <h1 className={styles.title}>点数早見表</h1>
 
         <div className={styles.tableWrapper}>
-          <LowScoreTable />
+          <div className={styles.desktopScoreTable}>
+            <LowScoreTable />
+          </div>
+
+          <div className={styles.mobileScoreTables}>
+            <LowScoreTableParent />
+            <LowScoreTableChild />
+          </div>
+
           <HighScoreTable />
         </div>
 

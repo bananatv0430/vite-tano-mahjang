@@ -1,12 +1,44 @@
 
 import { db } from "../utils/db.js";
 import { format } from "../utils/format.js";
+import { groupResultRows } from "../utils/resultGroups.js";
 import { insertLog } from "./logs.js";
 
 const routes = [];
 
 function formatLogDate(date) {
   return String(date).replace(/-/g, "年").replace(/(\d{4})年(\d{2})年(\d{2})/, "$1年$2月$3日");
+}
+
+/** 半荘と参加者の成績を保存し、新規作成した対局IDを返す。 */
+async function insertGameRounds(env, { date, ruleId, playMode, rounds, mapPlayerResult }) {
+  const gameIds = [];
+
+  for (let index = 0; index < rounds.length; index += 1) {
+    const insertResult = await db.execute(
+      env,
+      `INSERT INTO games (date, match_number, umaoka_rule_id, play_mode) VALUES (?, ?, ?, ?)`,
+      [date, index + 1, ruleId, playMode]
+    );
+    let gameId = insertResult.lastInsertId;
+    if (!gameId) {
+      const lastGame = await db.queryOne(env, "SELECT MAX(id) as maxId FROM games");
+      gameId = lastGame?.maxId;
+    }
+    if (!gameId) throw new Error("gameIdが取得できませんでした");
+    gameIds.push(gameId);
+
+    for (const player of rounds[index].players ?? []) {
+      const { score, rank, point } = mapPlayerResult(player);
+      await db.execute(
+        env,
+        `INSERT INTO game_results (game_id, player_id, final_score, rank, final_point) VALUES (?, ?, ?, ?, ?)`,
+        [gameId, player.playerId, score, rank, point]
+      );
+    }
+  }
+
+  return gameIds;
 }
 
 /**
@@ -62,7 +94,7 @@ routes.push({
   handler: async ({ env, query }) => {
     try {
       const date = String(query?.get?.("date") ?? "").trim();
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      if (!format.isDate(date)) {
         return Response.json({ ok: false, error: "date は YYYY-MM-DD 形式で指定してください" }, { status: 400 });
       }
 
@@ -73,6 +105,7 @@ routes.push({
           g.id AS game_id,
           g.date,
           g.match_number,
+          g.play_mode,
           u.id AS rule_id,
           u.name AS rule_name,
           u.oka,
@@ -95,74 +128,27 @@ routes.push({
         [date]
       );
 
-      // groupResultRowsByDate相当の整形
-      const getJapaneseWeekday = (dateValue) => {
-        const d = new Date(`${dateValue}T00:00:00`);
-        const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
-        return Number.isNaN(d.getTime()) ? "" : weekdays[d.getDay()];
-      };
-      const dateMap = new Map();
-      for (const row of rows) {
-        if (!dateMap.has(row.date)) {
-          dateMap.set(row.date, {
-            date: row.date,
-            day: getJapaneseWeekday(row.date),
-            games: [],
-            participants: [],
-          });
-        }
-        const dateEntry = dateMap.get(row.date);
-        let gameEntry = dateEntry.games.find((game) => game.gameId === row.game_id);
-        if (!gameEntry) {
-          gameEntry = {
-            gameId: row.game_id,
-            matchNumber: row.match_number,
-            rule: {
-              id: row.rule_id,
-              name: row.rule_name,
-              oka: row.oka,
-              uma1: row.uma1,
-              uma2: row.uma2,
-              startScore: row.start_score,
-            },
-            players: [],
-          };
-          dateEntry.games.push(gameEntry);
-        }
-        const playerEntry = {
-          playerId: row.player_id,
-          name: row.player_name,
-          iconPath: row.icon_path,
-          rank: row.rank,
-          finalScore: row.final_score,
-          finalPoint: row.final_point,
-        };
-        gameEntry.players.push(playerEntry);
-        if (!dateEntry.participants.some((player) => player.playerId === row.player_id)) {
-          dateEntry.participants.push({
-            playerId: row.player_id,
-            name: row.player_name,
-            iconPath: row.icon_path,
-          });
-        }
-      }
-      const dateEntry = Array.from(dateMap.values())[0];
+      // JOIN結果を共通の表示データへ変換する。
+      const dateEntry = groupResultRows(rows)[0];
       if (!dateEntry) {
         return Response.json({
           ok: true,
           date,
-          day: getJapaneseWeekday(date),
+          day: format.weekday(date),
           ruleId: null,
+          playMode: "offline",
           participants: [],
           games: []
         });
       }
       const primaryRule = dateEntry.games[0]?.rule ?? null;
+      const primaryPlayMode = format.playMode(dateEntry.games[0]?.playMode ?? "offline");
       return Response.json({
         ok: true,
         date: dateEntry.date,
         day: dateEntry.day,
         ruleId: primaryRule?.id ?? null,
+        playMode: primaryPlayMode,
         rule: primaryRule,
         participants: dateEntry.participants,
         games: dateEntry.games,
@@ -263,40 +249,25 @@ routes.push({
       const {
         date,        // YYYY-MM-DD
         ruleId,      // ルールID
+        playMode,    // online / offline
         rounds = [], // 各半荘の配列
         message      // ログ用メッセージ（フロントエンドで生成）
       } = body || {};
 
-      // roundsの数だけgamesテーブルにmatch_number=1,2,3...で登録
-      const gameIds = [];
-      for (let i = 0; i < rounds.length; i++) {
-        // gamesテーブルに1件INSERTし、lastInsertIdを必ず取得
-        const result = await db.execute(
-          env,
-          `INSERT INTO games (date, match_number, umaoka_rule_id) VALUES (?, ?, ?)` ,
-          [date, i + 1, ruleId]
-        );
-        let gameId = result.lastInsertId;
-        if (!gameId) {
-          // フォールバック: 直近のidをSELECTで取得
-          const lastGame = await db.queryOne(env, 'SELECT MAX(id) as maxId FROM games');
-          gameId = lastGame?.maxId;
-        }
-        if (!gameId) throw new Error('gameIdが取得できませんでした');
-        gameIds.push(gameId);
+      const normalizedPlayMode = format.playMode(playMode);
 
-        // game_resultsのidもAUTOINCREMENTなのでid省略でOK
-        if (rounds[i].players) {
-          for (let j = 0; j < rounds[i].players.length; j++) {
-            const player = rounds[i].players[j];
-            await db.execute(
-              env,
-              `INSERT INTO game_results (game_id, player_id, final_score, rank, final_point) VALUES (?, ?, ?, ?, ?)` ,
-              [gameId, player.playerId, player.score, player.rank, player.point ?? 0]
-            );
-          }
-        }
-      }
+      // 新規登録では入力済みの順位点をそのまま保存する。
+      const gameIds = await insertGameRounds(env, {
+        date,
+        ruleId,
+        playMode: normalizedPlayMode,
+        rounds,
+        mapPlayerResult: (player) => ({
+          score: player.score,
+          rank: player.rank,
+          point: player.point ?? 0,
+        }),
+      });
 
       // ログ登録（メッセージはバックエンドで生成）
       const msg = `${formatLogDate(date)}の試合データの登録が完了しました。`;
@@ -318,8 +289,8 @@ routes.push({
   path: "/",
   handler: async ({ env, body }) => {
     try {
-      const { date, ruleId, rounds = [], message } = body || {};
-      if (!/^[\d]{4}-[\d]{2}-[\d]{2}$/.test(date)) {
+      const { date, ruleId, playMode, rounds = [], message } = body || {};
+      if (!format.isDate(date)) {
         return format.error("日付の形式が不正です");
       }
       if (!Number.isInteger(ruleId) || ruleId <= 0) {
@@ -328,6 +299,8 @@ routes.push({
       if (!Array.isArray(rounds) || rounds.length === 0) {
         return format.error("登録する試合がありません");
       }
+
+      const normalizedPlayMode = format.playMode(playMode);
 
       // 既存データ削除
       await db.execute(env, `DELETE FROM game_results WHERE game_id IN (SELECT id FROM games WHERE date = ?)` , [date]);
@@ -341,37 +314,22 @@ routes.push({
       const uma2 = Number(ruleRow.uma2 ?? 0);
       const oka = Number(ruleRow.oka ?? 30000);
 
-      // 各半荘を新規登録
-      const gameIds = [];
-      for (let i = 0; i < rounds.length; i++) {
-        const result = await db.execute(env, `INSERT INTO games (date, match_number, umaoka_rule_id) VALUES (?, ?, ?)`, [date, i + 1, ruleId]);
-        let gameId = result.lastInsertId;
-        if (!gameId) {
-          const lastGame = await db.queryOne(env, 'SELECT MAX(id) as maxId FROM games');
-          gameId = lastGame?.maxId;
-        }
-        if (!gameId) throw new Error('gameIdが取得できませんでした');
-        gameIds.push(gameId);
-
-        if (rounds[i].players) {
-          for (let j = 0; j < rounds[i].players.length; j++) {
-            const player = rounds[i].players[j];
-            // final_point計算
-            const rank = Number(player.rank);
-            const score = Number(player.score);
-            // rank point計算
-            const rankPoints = [uma1 + ((oka - startPoint) * 4) / 1000, uma2, -uma2, -uma1];
-            const rankIndex = Math.max(0, Math.min(3, rank - 1));
-            const basePoint = (score - oka) / 1000;
-            const finalPoint = Number((basePoint + Number(rankPoints[rankIndex] ?? 0)).toFixed(1));
-            await db.execute(
-              env,
-              `INSERT INTO game_results (game_id, player_id, final_score, rank, final_point) VALUES (?, ?, ?, ?, ?)` ,
-              [gameId, player.playerId, score, rank, finalPoint]
-            );
-          }
-        }
-      }
+      const rankPoints = [uma1 + ((oka - startPoint) * 4) / 1000, uma2, -uma2, -uma1];
+      // 編集では選択ルールから順位点を再計算して保存する。
+      const gameIds = await insertGameRounds(env, {
+        date,
+        ruleId,
+        playMode: normalizedPlayMode,
+        rounds,
+        mapPlayerResult: (player) => {
+          const rank = Number(player.rank);
+          const score = Number(player.score);
+          const rankIndex = Math.max(0, Math.min(3, rank - 1));
+          const basePoint = (score - oka) / 1000;
+          const point = Number((basePoint + Number(rankPoints[rankIndex] ?? 0)).toFixed(1));
+          return { score, rank, point };
+        },
+      });
 
       // ログ登録（メッセージはバックエンドで生成）
       const msg = `${formatLogDate(date)}の試合データの編集が完了しました。`;
@@ -405,7 +363,7 @@ routes.push({
         date = url.searchParams.get("date")?.trim() || "";
       }
       console.log("[DELETE /api/games] date=", date);
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      if (!format.isDate(date)) {
         console.error("dateパラメータ不正:", date);
         return Response.json({ ok: false, error: "date は YYYY-MM-DD 形式で指定してください" }, { status: 400 });
       }

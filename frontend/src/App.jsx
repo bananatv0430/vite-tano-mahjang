@@ -10,11 +10,19 @@ import DataEditDelete from "./pages/DataEditDelete";
 import Player from "./pages/Player";
 import RuleList from "./pages/RuleList";
 import RuleScore from "./pages/RuleScore";
+import RuleScoreMobile from "./pages/RuleScoreMobile";
 import RuleFu from "./pages/RuleFu";
 import RuleOrg from "./pages/RuleOrg";
 import OtherSchedule from "./pages/OtherSchedule";
 import OtherNews from "./pages/OtherNews";
 import OtherLog from "./pages/OtherLog";
+import { useMediaQuery } from "./hooks/useMediaQuery";
+
+function RuleScoreAutoSwitch() {
+  const isMobile = useMediaQuery("(max-width: 600px)");
+
+  return isMobile ? <RuleScoreMobile /> : <RuleScore />;
+}
 
 function AppLayout() {
   const location = useLocation();
@@ -97,7 +105,8 @@ function AppLayout() {
             <Route path="/data/edit-delete" element={<DataEditDelete />} />
             <Route path="/player" element={<Player />} />
             <Route path="/rule/list" element={<RuleList />} />
-            <Route path="/rule/score" element={<RuleScore />} />
+            <Route path="/rule/score" element={<RuleScoreAutoSwitch />} />
+            <Route path="/rule/score-mobile" element={<RuleScoreMobile />} />
             <Route path="/rule/fu" element={<RuleFu />} />
             <Route path="/rule/org" element={<RuleOrg />} />
             <Route path="/other/schedule" element={<OtherSchedule />} />

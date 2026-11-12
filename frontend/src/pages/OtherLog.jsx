@@ -1,4 +1,7 @@
+
 import { useEffect, useRef, useState } from "react";
+import { fetchJson } from "../utils/apiFetch";
+import { useActivateMain } from "../hooks/useActivateMain";
 
 export default function OtherLog() {
   const mainRef = useRef(null);
@@ -6,17 +9,11 @@ export default function OtherLog() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  useActivateMain(mainRef);
+
   useEffect(() => {
-    const main = mainRef.current;
-    if (main) {
-      main.classList.add("-active");
-    }
     // ログ取得
-    fetch("/api/logs")
-      .then((res) => {
-        if (!res.ok) throw new Error("ログ取得に失敗しました");
-        return res.json();
-      })
+    fetchJson("/api/logs", undefined, "ログ取得に失敗しました")
       .then((data) => {
         setLogs(Array.isArray(data.logs) ? data.logs : []);
         setLoading(false);

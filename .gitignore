@@ -1,0 +1,10 @@
+# Local Cloudflare development state and deployment metadata
+.wrangler/
+
+# Local work files and browser verification artifacts
+work/
+
+# Local frontend environment and generated build files
+frontend/.env
+frontend/node_modules/
+frontend/dist/

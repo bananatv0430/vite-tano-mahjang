@@ -3,7 +3,34 @@ import React from "react";
 const Footer = () => (
   <>
     <style>{`
+      .p-footer__bird {
+        width: 200px;
+      }
+
+      .p-footer__birdImg {
+        display: block;
+        filter:
+          drop-shadow(1px 0 0 rgba(255, 255, 255, 0.98))
+          drop-shadow(-1px 0 0 rgba(255, 255, 255, 0.98))
+          drop-shadow(0 1px 0 rgba(255, 255, 255, 0.98))
+          drop-shadow(0 -1px 0 rgba(255, 255, 255, 0.98))
+          drop-shadow(1px 1px 0 rgba(255, 255, 255, 0.98))
+          drop-shadow(-1px 1px 0 rgba(255, 255, 255, 0.98))
+          drop-shadow(1px -1px 0 rgba(255, 255, 255, 0.98))
+          drop-shadow(-1px -1px 0 rgba(255, 255, 255, 0.98));
+      }
+
+      .p-footer__birdLink {
+        display: block;
+      }
+
       @media (max-width: 767px) {
+        .p-footer__bird {
+          width: 68px;
+          top: -48px;
+          left: 10px;
+        }
+
         .p-footer__upper {
           padding-top: 12px !important;
           padding-bottom: 12px !important;
@@ -30,7 +57,9 @@ const Footer = () => (
             <a href="https://schit.net/mashiko/jhtano/"><img className="p-footer__logoImg" src="/assets/media/img/common/school_emblem.png" alt="T.League" /></a>
           </p>
           <figure className="p-footer__bird">
-            <img className="p-footer__birdImg" src="/assets/media/img/common/img-bird.svg" alt="イラスト:麻雀の牌に描かれている鳥" />
+            <a className="p-footer__birdLink" href="https://www.town.mashiko.lg.jp/" target="_blank" rel="noreferrer">
+              <img className="p-footer__birdImg" src="/assets/media/img/common/mashikotto.png" alt="イラスト:mashikotto" />
+            </a>
           </figure>
         </div>
       </div>

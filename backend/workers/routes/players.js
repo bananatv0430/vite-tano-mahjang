@@ -85,12 +85,30 @@ routes.push({
 routes.push({
   method: "GET",
   path: "/player-stats/:playerId",
-  handler: async ({ env, params }) => {
+  handler: async ({ env, params, query }) => {
     try {
       const playerId = Number(params.playerId);
       if (!playerId) {
         return new Response(JSON.stringify({ error: "不正なプレイヤーIDです" }), { status: 400 });
       }
+      const playModeRaw = String(query?.get("play_mode") ?? "all").toLowerCase();
+      const playMode = playModeRaw === "online" || playModeRaw === "offline" ? playModeRaw : "all";
+      const modeFilterSql = `
+        AND (
+          ? = 'all'
+          OR (
+            ? = 'online'
+            AND LOWER(COALESCE(g.play_mode, 'offline')) IN ('online', 'on', '1', 'true')
+          )
+          OR (
+            ? = 'offline'
+            AND LOWER(COALESCE(g.play_mode, 'offline')) NOT IN ('online', 'on', '1', 'true')
+          )
+        )
+      `;
+      const yearlyParams = [playerId, playMode, playMode, playMode];
+      const totalParams = [playerId, playMode, playMode, playMode];
+
       // 年別成績
       const yearly = await db.queryAll(
         env,
@@ -108,10 +126,11 @@ routes.push({
         FROM game_results gr
         JOIN games g ON g.id = gr.game_id
         WHERE gr.player_id = ?
+          ${modeFilterSql}
         GROUP BY year
         ORDER BY year DESC
         `,
-        [playerId]
+        yearlyParams
       );
       // 合計成績
       const totalArr = await db.queryAll(
@@ -127,9 +146,11 @@ routes.push({
             END, 4
           ) AS avoidFourthRate
         FROM game_results gr
+        JOIN games g ON g.id = gr.game_id
         WHERE gr.player_id = ?
+          ${modeFilterSql}
         `,
-        [playerId]
+        totalParams
       );
       const total = totalArr && totalArr[0] ? totalArr[0] : null;
       return new Response(JSON.stringify({ total, yearly }), { headers: { "Content-Type": "application/json" } });
@@ -185,54 +206,73 @@ routes.push({
       if (body && typeof body.get === "function") {
         name = body.get("name");
         file = body.get("icon");
+        icon_path = body.get("icon_path"); // 画像削除時の空指定用
       } else {
         // JSON
         name = body?.name;
+        icon_path = body?.icon_path;
       }
 
-      const exists = await db.queryOne(env,
-        `SELECT id FROM players WHERE id = ?`,
+      // 既存プレイヤー情報取得（icon_path取得のため）
+      const player = await db.queryOne(env,
+        `SELECT * FROM players WHERE id = ?`,
         [id]
       );
-      if (!exists) return format.notFound("Player not found");
+      if (!player) return format.notFound("Player not found");
 
+      let new_icon_path = player.icon_path;
+      let old_icon_path = player.icon_path;
 
       // 画像ファイルがあればR2にアップロード
       if (file && typeof file.arrayBuffer === "function") {
-        console.log("file:", file);
-
         const ext = file.name ? file.name.split('.').pop() : "png";
         const now = Date.now();
         const fileName = `players/user${id}_${now}.${ext}`;
-
+        console.log("R2 upload target", fileName);
         try {
-          console.log("upload start");
-
           const arrayBuffer = await file.arrayBuffer();
-
           await env.R2_BUCKET.put(fileName, arrayBuffer, {
             httpMetadata: {
               contentType: file.type || "image/png",
             },
           });
-
-          console.log("upload success:", fileName);
-
-          icon_path = `/r2/${fileName}`;
-
+          console.log("R2 upload success", fileName);
+          new_icon_path = `/r2/${fileName}`;
         } catch (e) {
           console.error("R2 upload error", e);
           throw e;
+        }
+      } else if (icon_path === "") {
+        // 画像削除リクエスト（icon_pathを空に）
+        new_icon_path = "";
+      }
+
+      // 古い画像の削除（新規アップロードまたは削除時）
+      if (old_icon_path && old_icon_path.startsWith("/r2/")) {
+        // 新しい画像がアップロードされた、または削除リクエスト
+        if ((file && typeof file.arrayBuffer === "function") || icon_path === "") {
+          const oldKey = old_icon_path.replace("/r2/", "");
+          console.log("delete target", oldKey);
+          try {
+            await env.R2_BUCKET.delete(oldKey);
+            console.log("R2 delete success", oldKey);
+          } catch (e) {
+            // R2に削除対象が存在しない場合はエラーを出さずスルー
+            if (e && typeof e.message === "string" && e.message.includes("NoSuchKey")) {
+              // 存在しない場合は何もしない
+            } else {
+              // それ以外のエラーのみ警告
+              console.warn("R2 delete warning", e);
+            }
+          }
         }
       }
 
       // DB更新
       let sql = `UPDATE players SET name = ?`;
       let paramsArr = [name];
-      if (icon_path) {
-        sql += `, icon_path = ?`;
-        paramsArr.push(icon_path);
-      }
+      sql += `, icon_path = ?`;
+      paramsArr.push(new_icon_path);
       sql += ` WHERE id = ?`;
       paramsArr.push(id);
 

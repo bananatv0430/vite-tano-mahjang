@@ -1,45 +1,30 @@
 
 
 import { useEffect, useRef, useState } from "react";
+import { apiFetch, fetchJson } from "../utils/apiFetch";
 
-import { getIconSrc } from "../utils/getIconSrc";
-
-// fallbackアイコン生成
-const createFallbackIcon = (name) => {
-  const firstChar = String(name ?? "?").slice(0, 1);
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
-      <circle cx="60" cy="60" r="58" fill="#ffffff" stroke="#b5b5b5" stroke-width="2" />
-      <text x="60" y="66" text-anchor="middle" font-size="12" fill="#888">NO IMAGE</text>
-      <text x="60" y="100" text-anchor="middle" font-size="32" fill="#bbb">${firstChar}</text>
-    </svg>
-  `;
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-};
-
-// 共通getIconSrcラッパー
-const getPlayerIconSrc = (iconPath, iconVersion, name) => {
-  return getIconSrc(iconPath, iconVersion, createFallbackIcon(name));
-};
+import { normalizePlayer } from "../utils/gameUtils";
+import { createFallbackIcon } from "../utils/createFallbackIcon";
+import { getPlayerIconSrc } from "../utils/playerIcons";
+import { useMediaQuery } from "../hooks/useMediaQuery";
+import { useActivateMain } from "../hooks/useActivateMain";
 
 export default function Player() {
   const mainRef = useRef(null);
 
   const [players, setPlayers] = useState([]);
   const [editingPlayer, setEditingPlayer] = useState(null);
-  const [editForm, setEditForm] = useState({ name: "", icon_path: "" });
+  const [editForm, setEditForm] = useState({ name: "", iconPath: "" });
   const [selectedIconFile, setSelectedIconFile] = useState(null);
   const [iconPreview, setIconPreview] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
-  const [isMobileUploadUi, setIsMobileUploadUi] = useState(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-      return false;
-    }
+  const [selectedStatsFilterMap, setSelectedStatsFilterMap] = useState({});
+  const isMobileUploadUi = useMediaQuery("(max-width: 767px), (pointer: coarse)");
+  const fallbackIcon = createFallbackIcon(editForm.name || editingPlayer?.name);
 
-    return window.matchMedia("(max-width: 767px), (pointer: coarse)").matches;
-  });
+  useActivateMain(mainRef);
 
   const modalActionButtonStyle = {
     minWidth: "120px",
@@ -56,9 +41,9 @@ export default function Player() {
     setSaveError("");
     setEditForm({
       name: player?.name ?? "",
-      icon_path: player?.icon_path ?? "",
+      iconPath: player?.iconPath ?? "",
     });
-    setIconPreview(getPlayerIconSrc(player?.icon_path, player?.icon_version, player?.name));
+    setIconPreview(getPlayerIconSrc(player?.iconPath, player?.icon_version, player?.name));
   };
 
   const closeEditor = () => {
@@ -67,7 +52,7 @@ export default function Player() {
     setIsDragOver(false);
     setIsSaving(false);
     setSaveError("");
-    setEditForm({ name: "", icon_path: "" });
+    setEditForm({ name: "", iconPath: "" });
     setIconPreview((prev) => {
       if (prev && prev.startsWith("blob:")) {
         URL.revokeObjectURL(prev);
@@ -120,12 +105,12 @@ export default function Player() {
     try {
       const formData = new FormData();
       formData.append("name", trimmedName);
-      formData.append("icon_path", editForm.icon_path || "");
+      formData.append("icon_path", editForm.iconPath || "");
       if (selectedIconFile) {
         formData.append("icon", selectedIconFile);
       }
 
-      const response = await fetch(`/api/players/${editingPlayer.id}`, {
+      const response = await apiFetch(`/api/players/${editingPlayer.id}`, {
         method: "PUT",
         body: formData,
       });
@@ -147,10 +132,10 @@ export default function Player() {
         throw new Error("保存結果の取得に失敗しました");
       }
 
+      const updatedPlayer = normalizePlayer(data.data || data);
+      updatedPlayer.icon_version = Date.now();
       setPlayers((prev) => prev.map((player) => (
-        player.id === editingPlayer.id
-          ? { ...(data.data || data), icon_version: Date.now() }
-          : player
+        player.id === editingPlayer.id ? updatedPlayer : player
       )));
       closeEditor();
     } catch (error) {
@@ -161,59 +146,27 @@ export default function Player() {
   };
 
   useEffect(() => {
-    const main = mainRef.current;
-    if (main) {
-      main.classList.add("-active");
-    }
-    fetch("/api/players")
-      .then((res) => {
-        if (!res.ok) throw new Error("API error");
-        return res.json();
-      })
+    fetchJson("/api/players", undefined, "API error")
       .then((data) => {
         const players = data.data;
         if (Array.isArray(players) && players.length > 0) {
-          setPlayers(players.map((player) => ({
-            ...player,
-            icon_version: player.icon_path ? 1 : 0,
-          })));
+          setPlayers(players.map(normalizePlayer));
         } else {
-          setPlayers([
-            { id: 0, name: "(データなし)", icon_version: 0 }
-          ]);
+          setPlayers([{ id: 0, name: "(データなし)" }]);
         }
       })
       .catch(() => {
-        setPlayers([
-          { id: 0, name: "(データ取得エラー)", age: "--"}
-        ]);
+        setPlayers([{ id: 0, name: "(データ取得エラー)", age: "--" }]);
       });
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-      return undefined;
-    }
-
-    const mediaQuery = window.matchMedia("(max-width: 767px), (pointer: coarse)");
-    const updateMobileUploadUi = (event) => {
-      setIsMobileUploadUi(event.matches);
-      setIsDragOver(false);
-    };
-
-    updateMobileUploadUi(mediaQuery);
-
-    if (typeof mediaQuery.addEventListener === "function") {
-      mediaQuery.addEventListener("change", updateMobileUploadUi);
-      return () => mediaQuery.removeEventListener("change", updateMobileUploadUi);
-    }
-
-    mediaQuery.addListener(updateMobileUploadUi);
-    return () => mediaQuery.removeListener(updateMobileUploadUi);
-  }, []);
+    setIsDragOver(false);
+  }, [isMobileUploadUi]);
 
   // 全プレイヤー分の成績データ
   const [playerStatsMap, setPlayerStatsMap] = useState({});
+  const getPlayerStatsFilter = (playerId) => selectedStatsFilterMap[String(playerId)] ?? "all";
 
   useEffect(() => {
     if (players.length === 0) return;
@@ -223,18 +176,25 @@ export default function Player() {
       await Promise.all(players.map(async (player) => {
         if (!player.id) return;
         try {
-          const res = await fetch(`/api/players/player-stats/${player.id}`, { signal: controller.signal });
-          if (res.ok) {
-            const data = await res.json();
-            if (data && data.total) statsObj[player.id] = data;
-          }
-        } catch {}
+          const filterMode = getPlayerStatsFilter(player.id);
+          const suffix = filterMode === "online" || filterMode === "offline"
+            ? `?play_mode=${filterMode}`
+            : "";
+          const data = await fetchJson(
+            `/api/players/player-stats/${player.id}${suffix}`,
+            { signal: controller.signal },
+            "個人成績の取得に失敗しました"
+          );
+          if (data && data.total) statsObj[player.id] = data;
+        } catch {
+          // 対局成績が取得できないプレイヤーは今回の一覧から除外する。
+        }
       }));
       setPlayerStatsMap(statsObj);
     };
     fetchStats();
     return () => controller.abort();
-  }, [players]);
+  }, [players, selectedStatsFilterMap]);
 
   return (
     <main ref={mainRef} className="l-main p-loadAnimation" role="main">
@@ -249,14 +209,14 @@ export default function Player() {
                 </section>
               <div className="p-team-detail__body">
                 <ul className="p-team-detail__player-list">
-                  {players.map((player, idx) => (
+                  {players.map((player) => (
                     <li key={player.id}>
                       <div className="c-player-profile">
                         <div className="c-player-profile__column01">
                           <div>
                             <img
                               alt=""
-                              src={getPlayerIconSrc(player.icon_path, player.icon_version, player.name)}
+                              src={getPlayerIconSrc(player.iconPath, player.icon_version, player.name)}
                               onError={(e) => {
                                 e.currentTarget.onerror = null;
                                 e.currentTarget.src = createFallbackIcon(player.name);
@@ -292,6 +252,61 @@ export default function Player() {
                             </button>
                           </p>
                         </div>
+                      </div>
+                      <div
+                        style={{
+                          width: "100%",
+                          display: "flex",
+                          justifyContent: "center",
+                          margin: "6px 0 10px",
+                        }}
+                      >
+                        <ul
+                          style={{
+                            listStyle: "none",
+                            padding: 0,
+                            margin: 0,
+                            display: "inline-flex",
+                            gap: "8px",
+                            flexWrap: "nowrap",
+                            justifyContent: "center",
+                          }}
+                        >
+                          {[
+                            { key: "all", label: "すべて", style: { background: "#f2f2f2", color: "#333", borderColor: "#8a8a8a", activeBorderColor: "#4d4d4d" } },
+                            { key: "offline", label: "オフライン", style: { background: "#ffefef", color: "#b42318", borderColor: "#f2a7a0", activeBorderColor: "#d92d20" } },
+                            { key: "online", label: "オンライン", style: { background: "#eaf8ee", color: "#166534", borderColor: "#7bc992", activeBorderColor: "#2f8f57" } },
+                          ].map((filter) => {
+                            const isActive = getPlayerStatsFilter(player.id) === filter.key;
+                            return (
+                              <li key={filter.key} style={{ margin: 0 }}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedStatsFilterMap((current) => ({
+                                      ...current,
+                                      [String(player.id)]: filter.key,
+                                    }));
+                                  }}
+                                  style={{
+                                    minWidth: "96px",
+                                    height: "36px",
+                                    borderRadius: "999px",
+                                    border: `1.5px solid ${isActive ? filter.style.activeBorderColor : filter.style.borderColor}`,
+                                    cursor: "pointer",
+                                    fontWeight: 700,
+                                    opacity: isActive ? 1 : 0.55,
+                                    boxShadow: isActive ? `inset 0 0 0 1px ${filter.style.activeBorderColor}` : "none",
+                                    ...filter.style,
+                                  }}
+                                  aria-pressed={isActive}
+                                >
+                                  {filter.label}
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
                       </div>
                       <div className="c-score-table-scrollbox">
                         <table className="c-score-table">

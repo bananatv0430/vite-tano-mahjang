@@ -1604,7 +1604,11 @@ html:not([data-whatintent=mouse]):not([data-whatintent=touch]) .c-button:focus {
 }
 
 .c-schedule__logos img {
-    width: 100%
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    aspect-ratio: 1 / 1;
+    border-radius: 50%;
 }
 
 .c-schedule__teams {
@@ -2614,7 +2618,9 @@ html:not([data-whatintent=mouse]):not([data-whatintent=touch]) .p-footer__corpor
 
 .p-gamesResult__thumbnail>img {
     width: 100%;
-    height: auto
+    height: 100%;
+    object-fit: cover;
+    aspect-ratio: 1 / 1;
 }
 
 .p-gamesResult__columns {
@@ -3042,6 +3048,13 @@ html:not([data-whatintent=mouse]):not([data-whatintent=touch]) .p-gamesSchedule2
     height: 44px;
     margin-right: 7px;
     margin-left: auto
+}
+
+/* マウスで上部メニューをクリックしたときはオレンジのフォーカス枠を表示しない。 */
+html:not([data-whatintent=mouse]):not([data-whatintent=touch]) .p-globalNavi a:focus:not(:focus-visible),
+html:not([data-whatintent=mouse]):not([data-whatintent=touch]) .p-globalNavi button:focus:not(:focus-visible) {
+    outline: none;
+    box-shadow: none
 }
 
 .p-globalNavi__icon {

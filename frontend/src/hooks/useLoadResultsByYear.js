@@ -1,4 +1,16 @@
+
 import { useEffect, useState } from "react";
+import { fetchJson } from "../utils/apiFetch";
+
+const EMPTY_MATCHES = [];
+
+/** 年度結果APIの年度一覧と試合データを画面用に整える。 */
+function normalizeYearResults(data, normalizeMatchData) {
+  return {
+    availableYears: (data.availableYears ?? []).map((item) => String(item.year)),
+    matches: normalizeMatchData(data.dates ?? []),
+  };
+}
 
 /**
  * 年ごとの対戦履歴データ取得用カスタムフック
@@ -17,16 +29,18 @@ export function useLoadResultsByYear(normalizeMatchData) {
       setIsLoading(true);
       setLoadError("");
       try {
-        const response = await fetch("/api/results", { signal: controller.signal });
-        if (!response.ok) throw new Error("対戦履歴の取得に失敗しました");
-        const data = await response.json();
-        const years = (data.availableYears ?? []).map((item) => String(item.year));
-        const activeYear = String(data.year ?? years[0] ?? "");
-        setYearOptions(years);
+        const data = await fetchJson(
+          "/api/results",
+          { signal: controller.signal },
+          "対戦履歴の取得に失敗しました"
+        );
+        const normalized = normalizeYearResults(data, normalizeMatchData);
+        const activeYear = String(data.year ?? normalized.availableYears[0] ?? "");
+        setYearOptions(normalized.availableYears);
         if (activeYear) {
           setResultsByYear((current) => ({
             ...current,
-            [activeYear]: normalizeMatchData(data.dates ?? []),
+            [activeYear]: normalized.matches,
           }));
           setSelectedYear((current) => current || activeYear);
         }
@@ -48,13 +62,16 @@ export function useLoadResultsByYear(normalizeMatchData) {
       setIsLoading(true);
       setLoadError("");
       try {
-        const response = await fetch(`/api/results?year=${selectedYear}`, { signal: controller.signal });
-        if (!response.ok) throw new Error("対戦履歴の取得に失敗しました");
-        const data = await response.json();
-        setYearOptions((data.availableYears ?? []).map((item) => String(item.year)));
+        const data = await fetchJson(
+          `/api/results?year=${selectedYear}`,
+          { signal: controller.signal },
+          "対戦履歴の取得に失敗しました"
+        );
+        const normalized = normalizeYearResults(data, normalizeMatchData);
+        setYearOptions(normalized.availableYears);
         setResultsByYear((current) => ({
           ...current,
-          [selectedYear]: normalizeMatchData(data.dates ?? []),
+          [selectedYear]: normalized.matches,
         }));
       } catch (error) {
         if (error.name !== "AbortError") setLoadError(error.message || "対戦履歴の取得に失敗しました");
@@ -67,7 +84,9 @@ export function useLoadResultsByYear(normalizeMatchData) {
   }, [selectedYear, resultsByYear, normalizeMatchData]);
 
   // 表示用データ
-  const displayedMatches = selectedYear && resultsByYear[selectedYear] ? resultsByYear[selectedYear] : [];
+  const displayedMatches = selectedYear && resultsByYear[selectedYear]
+    ? resultsByYear[selectedYear]
+    : EMPTY_MATCHES;
 
   return {
     selectedYear,

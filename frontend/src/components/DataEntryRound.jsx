@@ -1,9 +1,18 @@
 import { memo } from "react";
 import { SCORE_PICKER_SET, SCORE_PICKER_VALUES, formatNumber } from "../utils/gameUtils";
 
+const ScorePickerOptions = memo(function ScorePickerOptions() {
+  return SCORE_PICKER_VALUES.map((scoreValue) => (
+    <option key={scoreValue} value={scoreValue}>
+      {formatNumber(scoreValue)}
+    </option>
+  ));
+});
+
 const DataEntryRound = memo(function DataEntryRound({
   round,
   roundIndex,
+  roundStartNumber = 1,
   isRoundValid,
   selectedPlayers,
   isMobileView,
@@ -13,6 +22,7 @@ const DataEntryRound = memo(function DataEntryRound({
   isDropTarget,
   onRemoveRound,
   onUpdateRoundPlayer,
+  onScoreCommit,
   onScoreKeyDown,
   onScoreStep,
   onRankStep,
@@ -22,6 +32,18 @@ const DataEntryRound = memo(function DataEntryRound({
   onRoundDragEnd,
   registerScoreInputRef,
 }) {
+  const displayRoundNumber = roundStartNumber + roundIndex;
+  const handleMobileInputFocus = (event) => {
+    if (!isMobileView) {
+      return;
+    }
+
+    // Delay selection slightly so mobile browsers finish focus transition first.
+    window.setTimeout(() => {
+      event.target.select?.();
+    }, 0);
+  };
+
   return (
     <div
       className={`dataEntry__round${isDragging ? " is-dragging" : ""}${isDropTarget ? " is-dropTarget" : ""}`}
@@ -46,7 +68,7 @@ const DataEntryRound = memo(function DataEntryRound({
               <span />
             </span>
           ) : null}
-          <span>第{roundIndex + 1}回戦</span>
+          <span>第{displayRoundNumber}回戦</span>
         </div>
         <div className="dataEntry__roundHeaderActions">
           {!isRoundValid ? (
@@ -59,7 +81,7 @@ const DataEntryRound = memo(function DataEntryRound({
             type="button"
             onClick={() => onRemoveRound(round.id, roundIndex)}
             disabled={isDeleteDisabled}
-            aria-label={`第${roundIndex + 1}回戦を削除`}
+            aria-label={`第${displayRoundNumber}回戦を削除`}
           >
             <span className="dataEntry__deleteCircle" aria-hidden="true" />
           </button>
@@ -81,10 +103,12 @@ const DataEntryRound = memo(function DataEntryRound({
                   ref={(element) => registerScoreInputRef(round.id, playerIndex, element)}
                   className="dataEntry__smallInput"
                   type="number"
-                  inputMode="numeric"
+                  inputMode={isMobileView ? "decimal" : "numeric"}
                   step="100"
                   value={player.score}
                   onChange={(event) => onUpdateRoundPlayer(round.id, playerIndex, "score", event.target.value)}
+                  onFocus={handleMobileInputFocus}
+                  onBlur={() => onScoreCommit?.(round.id)}
                   onKeyDown={(event) => onScoreKeyDown(event, round.id, playerIndex)}
                 />
                 {!isMobileView ? (
@@ -122,13 +146,10 @@ const DataEntryRound = memo(function DataEntryRound({
                       aria-label="点数をロールで選択"
                       value={SCORE_PICKER_SET.has(Number(player.score)) ? String(Number(player.score)) : ""}
                       onChange={(event) => onUpdateRoundPlayer(round.id, playerIndex, "score", event.target.value)}
+                      onBlur={() => onScoreCommit?.(round.id)}
                     >
                       <option value="">選択</option>
-                      {SCORE_PICKER_VALUES.map((scoreValue) => (
-                        <option key={scoreValue} value={scoreValue}>
-                          {formatNumber(scoreValue)}
-                        </option>
-                      ))}
+                      <ScorePickerOptions />
                     </select>
                   </div>
                 )}
@@ -150,6 +171,7 @@ const DataEntryRound = memo(function DataEntryRound({
                   step="1"
                   value={player.rank}
                   onChange={(event) => onUpdateRoundPlayer(round.id, playerIndex, "rank", event.target.value)}
+                  onFocus={handleMobileInputFocus}
                 />
                 {!isMobileView ? (
                   <div className="dataEntry__stepButtons">
