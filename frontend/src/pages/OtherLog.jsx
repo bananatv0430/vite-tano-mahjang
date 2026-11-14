@@ -54,7 +54,7 @@ export default function OtherLog() {
                 padding: "16px 20px"
               }}>
                 <div style={{ fontSize: 15, color: "#888", marginBottom: 6, fontWeight: 500 }}>{log.operated_at.replace("T", " ").slice(0, 19)}</div>
-                <div style={{ fontSize: 16, color: "#222" }}>{log.message}</div>
+                <div style={{ fontSize: 16, color: "#222", whiteSpace: "pre-line" }}>{log.message}</div>
               </div>
             ))
           )}
