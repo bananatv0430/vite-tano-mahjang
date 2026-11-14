@@ -6,6 +6,8 @@ import Main from "./pages/Main";
 import ResultsByDate from "./pages/ResultsByDate";
 import ResultsTotal from "./pages/ResultsTotal";
 import DataRegister from "./pages/DataRegister";
+import ReplayImport from "./pages/ReplayImport";
+import ReplayStats from "./pages/ReplayStats";
 import DataEditDelete from "./pages/DataEditDelete";
 import Player from "./pages/Player";
 import RuleList from "./pages/RuleList";
@@ -102,6 +104,8 @@ function AppLayout() {
             <Route path="/results/date" element={<ResultsByDate />} />
             <Route path="/results/total" element={<ResultsTotal />} />
             <Route path="/data/register" element={<DataRegister />} />
+            <Route path="/data/replays" element={<ReplayImport />} />
+            <Route path="/results/replay-stats" element={<ReplayStats />} />
             <Route path="/data/edit-delete" element={<DataEditDelete />} />
             <Route path="/player" element={<Player />} />
             <Route path="/rule/list" element={<RuleList />} />

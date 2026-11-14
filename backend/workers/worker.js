@@ -6,6 +6,7 @@ import resultsRoutes from './routes/results.js';
 import rankingsRoutes from './routes/rankings.js';
 import logsRoutes from './routes/logs.js';
 import rulesRoutes from './routes/rules.js';
+import replayRoutes from './routes/replays.js';
 
 const router = new Router();
 
@@ -16,6 +17,7 @@ router.mount('/api/results', resultsRoutes);
 router.mount('/api/rankings', rankingsRoutes);
 router.mount('/api/logs', logsRoutes);
 router.mount('/api/rules', rulesRoutes);
+router.mount('/api/replays', replayRoutes);
 
 // CORSヘッダー
 const corsHeaders = {

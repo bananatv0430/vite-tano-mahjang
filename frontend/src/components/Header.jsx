@@ -85,6 +85,7 @@ const Header = () => {
               <span className="p-globalNavi__link" >対戦成績</span>
               <div className="p-globalNavi__itemMenu" style={{ display: openMenu === 'results' ? 'block' : 'none' }}>
                 <Link className="p-globalNavi__link" to="/results/date" onClick={closeMenuAll}>対戦履歴</Link>
+                <Link className="p-globalNavi__link" to="/results/replay-stats" onClick={closeMenuAll}>雀魂詳細成績</Link>
                 <Link className="p-globalNavi__link" to="/results/total" onClick={closeMenuAll}>累計成績</Link>
               </div>
             </li>
@@ -97,6 +98,7 @@ const Header = () => {
               <span className="p-globalNavi__link" tabIndex={0}>データ編集</span>
               <div className="p-globalNavi__itemMenu" style={{ display: openMenu === 'data' ? 'block' : 'none' }}>
                 <Link className="p-globalNavi__link" to="/data/register" onClick={closeMenuAll}>データ登録</Link>
+                <Link className="p-globalNavi__link" to="/data/replays" onClick={closeMenuAll}>雀魂データ登録</Link>
                 <Link className="p-globalNavi__link" to="/data/edit-delete" onClick={closeMenuAll}>データ編集・削除</Link>
               </div>
             </li>
