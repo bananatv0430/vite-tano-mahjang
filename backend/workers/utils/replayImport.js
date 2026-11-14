@@ -23,7 +23,7 @@ export function readReplay(replay) {
   const players = final.map((result, index) => {
     const seat = seatOf(result);
     const account = accounts.get(seat);
-    requireReplay(Number.isInteger(seat) && seat >= 0 && seat < count && (account?.nickname || robots.has(seat)), "対局者情報が不足しています");
+    requireReplay(Number.isInteger(seat) && seat >= 0 && seat < count && (account?.nickname || robots.has(seat) || !account), "対局者情報が不足しています");
     return { seat, name: account?.nickname || "CPUプレイヤー", cpu: !account, accountId: account?.account_id ?? null,
       score: result.part_point_1 ?? 0, rank: index + 1, replayPoint: (result.total_point ?? 0) / 1000 };
   });
