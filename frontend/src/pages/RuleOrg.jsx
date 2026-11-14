@@ -9,7 +9,7 @@ import { useActivateMain } from "../hooks/useActivateMain";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 
 function getRuleValue(ruleKey, groupKey) {
-  return RULE_VALUES[ruleKey]?.[groupKey] ?? "-";
+  return RULE_VALUES[ruleKey]?.[groupKey] ?? "‐";
 }
 
 function renderRuleValue(ruleKey, groupKey) {
