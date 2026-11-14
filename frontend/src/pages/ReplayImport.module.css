@@ -99,10 +99,9 @@
   z-index: 2;
   background: #f08300;
 }
-.mobileScrollHint { display: none; }
 
 @media (max-width: 767px) {
-  .mobileScrollHint { display: block; margin-top: 8px; color: #555; font-size: 1.2rem; }
+  .statisticsTable:global(.dataEntry__round) { overscroll-behavior: none; }
   .statisticsTable table { border-collapse: separate; border-spacing: 0; }
   .statisticsTable th, .statisticsTable td { padding: 8px; font-size: 1.3rem; }
   .statisticsTable thead th:first-child,

@@ -153,7 +153,6 @@ function StatisticsView({ filters }) {
   const count = params.get("count");
   return <>
     <p role="status">{period} ／ {count ? count + "人戦" : "全対局"}{rows.some(row => row.stats) ? "" : " ／ 対象の詳細成績はありません。"}</p>
-    <p className={styles.mobileScrollHint}>横にスワイプして選手・CPUの成績を比較。指標名は左に固定されます。</p>
     <StatisticsTable rows={rows} count={count} />
   </>;
 }
