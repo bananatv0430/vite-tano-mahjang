@@ -166,6 +166,18 @@ async function importReplay({ env, body }) {
   }
 }
 
+const hasReplayDetails = "EXISTS (SELECT 1 FROM replay_round_players r WHERE r.replay_id = i.replay_id)";
+
+async function getStatsDates({ env }) {
+  const rows = await db.queryAll(env, `
+    SELECT DISTINCT i.played_on
+    FROM replay_imports i
+    WHERE ${hasReplayDetails}
+    ORDER BY i.played_on DESC
+  `);
+  return format.response(true, rows.map(row => row.played_on));
+}
+
 async function getStats({ env, query }) {
   const date = query.get("date");
   const year = query.get("year");
@@ -175,7 +187,7 @@ async function getStats({ env, query }) {
     return format.response(false, null, "集計期間または対局人数を正しく指定してください");
   }
 
-  const conditions = ["EXISTS (SELECT 1 FROM replay_round_players r WHERE r.replay_id = i.replay_id)"];
+  const conditions = [hasReplayDetails];
   const args = [];
   if (date) {
     conditions.push("i.played_on = ?");
@@ -215,4 +227,5 @@ export default { routes: [
   { method: "POST", path: "/", handler: importReplay },
   { method: "POST", path: "/player-accounts", handler: lookupPlayerAccounts },
   { method: "GET", path: "/stats", handler: getStats },
+  { method: "GET", path: "/stats/dates", handler: getStatsDates },
 ] };

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useActivateMain } from "../hooks/useActivateMain";
-import { apiFetch } from "../utils/apiFetch";
+import { getJapaneseWeekday } from "../utils/gameUtils";
+import { apiFetch, fetchJson } from "../utils/apiFetch";
 import EntrySharedStyles from "../components/EntrySharedStyles";
 import styles from "./ReplayImport.module.css";
 
@@ -157,14 +158,31 @@ function StatisticsView({ filters }) {
   </>;
 }
 
-function StatisticsFilters({ params, onApply }) {
+function PeriodSelect({ label, options, value, onChange, loading, error, formatOption }) {
+  return <label>{label}
+    <select className="dataEntry__select" required disabled={loading || !options.length}
+      value={options.includes(value) ? value : ""} onChange={event => onChange(event.target.value)}>
+      <option value="">{loading ? "読み込み中..." : error ? "取得できませんでした" :
+        options.length ? label + "を選択してください" : "登録済みの" + label + "がありません"}</option>
+      {options.map(option => <option value={option} key={option}>{formatOption(option)}</option>)}
+    </select>
+  </label>;
+}
+
+function StatisticsFilters({ params, dates, datesError, onApply }) {
   const [period, setPeriod] = useState(params.has("date") ? "date" : params.has("year") ? "year" : "");
   const [date, setDate] = useState(params.get("date") ?? "");
-  const [year, setYear] = useState(params.get("year") ?? String(new Date().getFullYear()));
+  const [year, setYear] = useState(params.get("year") ?? "");
   const [count, setCount] = useState(params.get("count") ?? "");
+
+  const dateOptions = dates ?? [];
+  const yearOptions = [...new Set(dateOptions.map(option => option.slice(0, 4)))];
+  const canApply = period === "date" ? dateOptions.includes(date) :
+    period === "year" ? yearOptions.includes(year) : true;
 
   function apply(event) {
     event.preventDefault();
+    if (!canApply) return;
     const next = new URLSearchParams();
     if (period === "date") next.set("date", date);
     if (period === "year") next.set("year", year);
@@ -177,12 +195,15 @@ function StatisticsFilters({ params, onApply }) {
       <label>集計期間<select className="dataEntry__select" value={period} onChange={event => setPeriod(event.target.value)}>
         <option value="">全期間</option><option value="date">指定対局日</option><option value="year">指定年</option>
       </select></label>
-      {period === "date" && <label>対局日<input className="dataEntry__input" type="date" required value={date} onChange={event => setDate(event.target.value)} /></label>}
-      {period === "year" && <label>年<input className="dataEntry__input" type="number" required min="1000" max="9999" value={year} onChange={event => setYear(event.target.value)} /></label>}
+      {period === "date" && <PeriodSelect label="対局日" options={dateOptions} value={date} onChange={setDate}
+        loading={dates === null && !datesError} error={datesError}
+        formatOption={option => `${option}（${getJapaneseWeekday(option)}）`} />}
+      {period === "year" && <PeriodSelect label="年" options={yearOptions} value={year} onChange={setYear}
+        loading={dates === null && !datesError} error={datesError} formatOption={option => option + "年"} />}
       <label>対局人数<select className="dataEntry__select" value={count} onChange={event => setCount(event.target.value)}>
         <option value="">すべて</option><option value="4">四人戦</option><option value="3">三人戦</option>
       </select></label>
-      <button className="c-button -primary -medium">表示</button>
+      <button className="c-button -primary -medium -gray" disabled={!canApply}>表示</button>
     </form>
   );
 }
@@ -193,6 +214,23 @@ export default function ReplayStats() {
   const [params, setParams] = useSearchParams();
   const [revision, setRevision] = useState(0);
   const filters = params.toString();
+  const [dates, setDates] = useState(null);
+  const [datesError, setDatesError] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    async function loadDates() {
+      try {
+        const result = await fetchJson("/api/replays/stats/dates", { signal: controller.signal }, "対局日の取得に失敗しました");
+        if (!result.ok || !Array.isArray(result.data)) throw new Error("対局日の取得に失敗しました");
+        if (!controller.signal.aborted) setDates(result.data);
+      } catch (error) {
+        if (!controller.signal.aborted) setDatesError(error.message);
+      }
+    }
+    loadDates();
+    return () => controller.abort();
+  }, []);
 
   return <main ref={mainRef} className="l-main u-next-fill-gray p-loadAnimation">
     <EntrySharedStyles />
@@ -205,7 +243,7 @@ export default function ReplayStats() {
     <section className={"p-gamesSchedule2 " + styles.registrationSection}>
       <div className="dataEntry__inner p-loadAnimation__target">
         <div className={"dataEntry__panel " + styles.page}>
-          <StatisticsFilters key={filters} params={params} onApply={next => {
+          <StatisticsFilters key={filters} params={params} dates={dates} datesError={datesError} onApply={next => {
             setParams(next);
             setRevision(previous => previous + 1);
           }} />
