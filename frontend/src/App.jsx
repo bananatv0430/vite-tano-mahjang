@@ -29,9 +29,12 @@ function RuleScoreAutoSwitch() {
 function AppLayout() {
   const location = useLocation();
   const isFirstRender = useRef(true);
-  const [pageAnimationState, setPageAnimationState] = useState("-deactive");
   const [displayLocation, setDisplayLocation] = useState(location);
-  const [isRouteVisible, setIsRouteVisible] = useState(true);
+  const isRouteVisible =
+    location.pathname === displayLocation.pathname &&
+    location.search === displayLocation.search &&
+    location.hash === displayLocation.hash;
+  const pageAnimationState = isRouteVisible ? "-deactive" : "-active";
 
   useEffect(() => {
     if (isFirstRender.current) {
@@ -40,12 +43,7 @@ function AppLayout() {
       return undefined;
     }
 
-    const isSamePage =
-      location.pathname === displayLocation.pathname &&
-      location.search === displayLocation.search &&
-      location.hash === displayLocation.hash;
-
-    if (isSamePage) {
+    if (isRouteVisible) {
       if (location.hash) {
         const target = document.querySelector(location.hash);
         if (target) {
@@ -58,33 +56,14 @@ function AppLayout() {
       return undefined;
     }
 
-    setPageAnimationState("-active");
-    setIsRouteVisible(false);
-
     const timeoutId = window.setTimeout(() => {
       setDisplayLocation(location);
-      setPageAnimationState("-deactive");
-
-      window.requestAnimationFrame(() => {
-        if (location.hash) {
-          const target = document.querySelector(location.hash);
-          if (target) {
-            target.scrollIntoView({ block: "start" });
-          } else {
-            window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-          }
-        } else {
-          window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-        }
-
-        setIsRouteVisible(true);
-      });
     }, 300);
 
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [location, displayLocation]);
+  }, [location, isRouteVisible]);
 
   return (
     <div className={`p-pageAnimation ${pageAnimationState}`}>
