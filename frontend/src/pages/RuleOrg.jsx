@@ -65,11 +65,7 @@ export default function RuleOrg() {
   useActivateMain(mainRef);
 
   useEffect(() => {
-    if (isMobile) {
-      setPcBodyScrollbarWidth(0);
-      setPcBodyScrollbarHeight(0);
-      return;
-    }
+    if (isMobile) return;
 
     const updateScrollbarWidth = () => {
       if (!rightBodyRef.current) {

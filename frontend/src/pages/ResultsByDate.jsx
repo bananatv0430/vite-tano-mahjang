@@ -1,5 +1,5 @@
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useLoadResultsByYear } from "../hooks/useLoadResultsByYear";
 import ResultsPreviewModal from "../components/ResultsPreviewModal";
 import ResultsPreviewStyles from "../components/ResultsPreviewStyles";
@@ -38,52 +38,30 @@ export default function ResultsByDate() {
     isLoading,
     loadError,
     displayedMatches,
+    resultsByYear,
   } = useLoadResultsByYear(normalizeMatchData);
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [selectedPlayModeFilter, setSelectedPlayModeFilter] = useState("all");
   const [roundPageStart, setRoundPageStart] = useState(0);
   const [slideDirection, setSlideDirection] = useState("next");
   const isMobileView = usePreviewViewport(selectedMatch, setSelectedMatch);
-  const [isSwitchingResults, setIsSwitchingResults] = useState(false);
+  const [previousMatches, setPreviousMatches] = useState([]);
 
   useActivateMain(mainRef);
-
-  // 年度切替時は選択中の試合・ページをリセット
-  useEffect(() => {
-    setSelectedMatch(null);
-    setRoundPageStart(0);
-  }, [selectedYear]);
-
-  // 表示用データはカスタムフックのdisplayedMatchesをそのまま利用
 
   const matches = useMemo(() => (
     selectedPlayModeFilter === "all"
       ? displayedMatches
       : displayedMatches.filter((match) => match.playMode === selectedPlayModeFilter)
   ), [displayedMatches, selectedPlayModeFilter]);
-  const [stableMatches, setStableMatches] = useState([]);
-
-  useEffect(() => {
-    if (isSwitchingResults && !isLoading) {
-      setIsSwitchingResults(false);
-    }
-  }, [isSwitchingResults, isLoading, matches.length]);
-
-  useEffect(() => {
-    if (isSwitchingResults && matches.length === 0) {
-      return;
-    }
-    setStableMatches(matches);
-  }, [isSwitchingResults, matches]);
-
-  const visibleMatches = isSwitchingResults && matches.length === 0 ? stableMatches : matches;
+  const awaitingYear = selectedYear && !resultsByYear[selectedYear] && !loadError;
+  const visibleMatches = awaitingYear ? previousMatches : matches;
   const resultsAreaMinHeight = isMobileView ? "460px" : "560px";
   const {
     roundsPerPage,
     pageCount,
     showTotalPage,
     visibleRounds,
-    hasRoundPager,
     handleRoundPageChange,
   } = useRoundPagination({ selectedMatch, isMobileView, roundPageStart, setRoundPageStart, setSlideDirection });
 
@@ -153,9 +131,10 @@ export default function ResultsByDate() {
                     aria-current={selectedYear === year ? "true" : undefined}
                     onClick={(event) => {
                       event.preventDefault();
-                      if (selectedYear !== year) {
-                        setIsSwitchingResults(true);
-                      }
+                      if (selectedYear === year) return;
+                      setPreviousMatches(visibleMatches);
+                      setSelectedMatch(null);
+                      setRoundPageStart(0);
                       setSelectedYear(year);
                     }}
                     style={{
@@ -208,12 +187,7 @@ export default function ResultsByDate() {
                   >
                     <button
                       type="button"
-                      onClick={() => {
-                        if (selectedPlayModeFilter !== mode.key) {
-                          setIsSwitchingResults(true);
-                        }
-                        setSelectedPlayModeFilter(mode.key);
-                      }}
+                      onClick={() => setSelectedPlayModeFilter(mode.key)}
                       style={{
                         width: "100%",
                         minWidth: isMobileView ? 0 : "96px",

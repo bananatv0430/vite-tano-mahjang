@@ -6,11 +6,9 @@ import { isTerminalOrHonor, isWind, isDragon } from "./yakuJudge";
  * @param {string[]} hand
  * @param {string[]} melds
  * @param {boolean} isTsumo
- * @param {boolean} isParent
- * @param {string} [winTile]
  * @returns {number}
  */
-export function calculateFu(hand, melds, isTsumo, isParent, winTile) {
+export function calculateFu(hand, melds, isTsumo) {
   const allTiles = [...hand, ...melds];
   if (allTiles.length === 0) return 30;
   let fu = 20; // 副底
@@ -24,7 +22,6 @@ export function calculateFu(hand, melds, isTsumo, isParent, winTile) {
     fu += 2;
   }
   // 面子の符を加算（簡易計算）
-  const uniqueTiles = Array.from(new Set(allTiles));
   const tileCounts = new Map();
   allTiles.forEach(tile => {
     tileCounts.set(tile, (tileCounts.get(tile) || 0) + 1);

@@ -46,7 +46,6 @@ export default function DataRegister() {
   // カスタムフックでプレイヤー・ルール取得
   const {
     playerOptions,
-    isLoadingPlayers,
     ruleOptions,
     isLoadingRules,
     rulesError,
@@ -96,24 +95,6 @@ export default function DataRegister() {
   });
   const isRegisterDisabled = isSubmitting || hasInvalidRoundTotal || !hasAllPlayersSelected || hasDuplicateSelectedPlayers || !!rulesError || isLoadingRules;
 
-  // 共通getIconSrcラッパー
-  // デバッグ用: 初回マウント時のみplayerOptions, selectedPlayerIds, selectedPlayersを出力
-  useEffect(() => {
-    console.log('[playerOptions]', playerOptions);
-    console.log('[selectedPlayerIds]', selectedPlayerIds);
-    // selectedPlayersはuseMemo依存配列に合わせて一度だけ出力
-    const players = selectedPlayerIds.map((playerId, index) => {
-      const player = playerOptions.find((item) => String(item.id) === String(playerId));
-      return player ?? {
-        id: `temp-${index}`,
-        name: `プレイヤー${index + 1}`,
-        iconPath: "",
-        iconVersion: "",
-        avatar: getPlayerIconSrc("", "", `プレイヤー${index + 1}`),
-      };
-    });
-    console.log('[selectedPlayers]', players);
-  }, []);
   const selectedPlayers = useMemo(
     () => selectedPlayerIds.map((playerId, index) => {
       const player = playerOptions.find((item) => String(item.id) === String(playerId));

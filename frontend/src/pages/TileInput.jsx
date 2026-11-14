@@ -3,7 +3,7 @@ import styles from "./TileInput.module.css";
 
 export default function TileInput() {
   const [handTiles, setHandTiles] = useState([]);
-  const [melds, setMelds] = useState([]);
+  const melds = [];
   const [inputValue, setInputValue] = useState("");
   const [tileType, setTileType] = useState("m"); // m: 萬子, p: 筒子, s: 索子, z: 字牌
 

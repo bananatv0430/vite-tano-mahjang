@@ -176,7 +176,7 @@ export default function Player() {
       await Promise.all(players.map(async (player) => {
         if (!player.id) return;
         try {
-          const filterMode = getPlayerStatsFilter(player.id);
+          const filterMode = selectedStatsFilterMap[String(player.id)] ?? "all";
           const suffix = filterMode === "online" || filterMode === "offline"
             ? `?play_mode=${filterMode}`
             : "";
@@ -190,7 +190,7 @@ export default function Player() {
           // 対局成績が取得できないプレイヤーは今回の一覧から除外する。
         }
       }));
-      setPlayerStatsMap(statsObj);
+      if (!controller.signal.aborted) setPlayerStatsMap(statsObj);
     };
     fetchStats();
     return () => controller.abort();

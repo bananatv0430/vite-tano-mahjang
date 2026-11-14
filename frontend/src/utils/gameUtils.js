@@ -12,7 +12,7 @@ export const createAvatar = (name) => {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 };
 
-export const getPlayerImageSrc = (iconPath, name, iconVersion) => {
+export const getPlayerImageSrc = (iconPath, name) => {
   if (!iconPath) {
     return createAvatar(name);
   }

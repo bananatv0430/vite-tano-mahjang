@@ -18,11 +18,9 @@ import {
   FALLBACK_PLAYERS,
   FALLBACK_RULES,
   buildEntryRound,
-  calculatePreviewPoint,
   calculateTotalStandings,
   createAvatar,
   createRound,
-  formatDisplayDate,
   getJapaneseWeekday,
 } from "../utils/gameUtils";
 import { apiFetch, readJsonOrEmpty, requestJson } from "../utils/apiFetch";
@@ -47,7 +45,6 @@ export default function DataEditDelete() {
     isLoadingDates,
     dateOptionsError,
     playerOptions,
-    isLoadingPlayers,
     ruleOptions,
     isLoadingRules,
     rulesError,
@@ -88,7 +85,7 @@ export default function DataEditDelete() {
   });
   const isDateSelected = Boolean(selectedDate);
   const isEditorDisabled = !isDateSelected || isLoadingDateData;
-  const isRegisterDisabled = isSubmitting || isEditorDisabled || hasInvalidRoundTotal || !hasAllPlayersSelected || hasDuplicateSelectedPlayers || !!rulesError || isLoadingRules;
+
 
   const selectedPlayers = useMemo(
     () => selectedPlayerIds.map((playerId, index) => {
@@ -209,33 +206,6 @@ export default function DataEditDelete() {
         },
       ];
 
-  const buildPreviewMatch = useCallback(() => ({
-    id: selectedDate,
-    date: formatDisplayDate(selectedDate),
-    day: getJapaneseWeekday(selectedDate),
-    playMode: selectedPlayMode,
-    rounds: entryRows.map((round, roundIndex) => ({
-      id: round.id,
-      roundNumber: roundIndex + 1,
-      ruleName: selectedRule.name,
-      players: [...round.players]
-        .map((player, playerIndex) => {
-          const selectedPlayer = selectedPlayers[playerIndex];
-          const playerName = selectedPlayer?.name || `プレイヤー${playerIndex + 1}`;
-          const rank = Number(player.rank || playerIndex + 1);
-
-          return {
-            playerId: selectedPlayer?.id ?? `temp-${round.id}-${playerIndex}`,
-            name: playerName,
-            avatar: selectedPlayer?.avatar ?? createAvatar(playerName),
-            rank,
-            point: calculatePreviewPoint(player.score, rank, selectedRule),
-          };
-        })
-        .sort((a, b) => a.rank - b.rank),
-    })),
-  }), [entryRows, selectedDate, selectedPlayMode, selectedPlayers, selectedRule]);
-
   const { roundsPerPage, pageCount, showTotalPage, visibleRounds, handleRoundPageChange } = useRoundPagination({
     selectedMatch,
     isMobileView,
@@ -325,19 +295,6 @@ export default function DataEditDelete() {
     removeRound(pendingRoundDelete.roundId);
     setPendingRoundDelete(null);
   }, [pendingRoundDelete, removeRound]);
-
-  const openPreviewMatch = useCallback(() => {
-    setRoundPageStart(0);
-    setSlideDirection("next");
-    setSelectedMatch(buildPreviewMatch());
-  }, [buildPreviewMatch]);
-
-  const resetEntryForm = useCallback(() => {
-    setEntryRows([createRound(1, playerOptions, selectedRule.startPoint)]);
-    setSelectedMatch(null);
-    setRoundPageStart(0);
-    setSlideDirection("next");
-  }, [playerOptions, selectedRule.startPoint]);
 
   const closeCompletedRegistration = useCallback(() => {
     setCompletedRegistration(null);

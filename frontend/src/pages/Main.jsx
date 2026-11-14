@@ -73,7 +73,6 @@ const Main = () => {
 		pageCount,
 		showTotalPage,
 		visibleRounds,
-		hasRoundPager,
 		handleRoundPageChange,
 	} = useRoundPagination({ selectedMatch, isMobileView, roundPageStart, setRoundPageStart, setSlideDirection });
 
