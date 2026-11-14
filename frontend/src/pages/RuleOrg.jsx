@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   GROUPS,
   GROUP_URLS,
@@ -7,6 +7,7 @@ import {
 } from "./ruleOrgData.js";
 import { useActivateMain } from "../hooks/useActivateMain";
 import { useMediaQuery } from "../hooks/useMediaQuery";
+import styles from "./RuleOrg.module.css";
 
 function getRuleValue(ruleKey, groupKey) {
   return RULE_VALUES[ruleKey]?.[groupKey] ?? "‐";
@@ -19,81 +20,44 @@ function renderRuleValue(ruleKey, groupKey) {
     return value;
   }
 
-  // ※付きの記号を検出する正規表現
-  const markerPattern = /※./;
-
-  if (!markerPattern.test(value)) {
-    return value;
-  }
-
-  // ※と文字で分割
-  const parts = value.split(/(※.)/);  return (
+  const lines = value.split("\n");
+  return (
     <>
-      {parts.map((part, idx) => {
-        if (/※./.test(part)) {
-          return (
-            <span key={idx} style={{ color: "#d32f2f", fontWeight: "bold" }}>
-              {part}
+      {lines.map((line, lineIndex) => (
+        <React.Fragment key={lineIndex}>
+          {lineIndex > 0 && <br />}
+          {line.split(/(?<!^)(?=[（(])|(?<=。)(?!$)/u).map((segment, segmentIndex) => (
+            <span className={styles.ruleSegment} key={segmentIndex}>
+              {segment.split(/(※.)/u).map((part, partIndex) => (
+                partIndex % 2 === 1
+                  ? <span className={styles.ruleMarker} key={partIndex}>{part}</span>
+                  : part
+              ))}
             </span>
-          );
-        }
-        return part;
-      })}
+          ))}
+        </React.Fragment>
+      ))}
     </>
   );
 }
 
 export default function RuleOrg() {
   const mainRef = useRef(null);
-  const leftBodyRef = useRef(null);
   const rightBodyRef = useRef(null);
-  const rightHeaderRef = useRef(null);
   const dragStateRef = useRef({
     active: false,
     pointerId: null,
-    startX: 0,
     startY: 0,
-    startScrollLeft: 0,
     startScrollTop: 0,
   });
   const [selected, setSelected] = useState(GROUPS[0].key);
   const isMobile = useMediaQuery("(max-width: 600px)");
   const [isDraggingPcTable, setIsDraggingPcTable] = useState(false);
-  const [pcBodyScrollbarWidth, setPcBodyScrollbarWidth] = useState(0);
-  const [pcBodyScrollbarHeight, setPcBodyScrollbarHeight] = useState(0);
 
   useActivateMain(mainRef);
 
-  useEffect(() => {
-    if (isMobile) return;
-
-    const updateScrollbarWidth = () => {
-      if (!rightBodyRef.current) {
-        return;
-      }
-      const width = rightBodyRef.current.offsetWidth - rightBodyRef.current.clientWidth;
-      const height = rightBodyRef.current.offsetHeight - rightBodyRef.current.clientHeight;
-      setPcBodyScrollbarWidth(width > 0 ? width : 0);
-      setPcBodyScrollbarHeight(height > 0 ? height : 0);
-    };
-
-    updateScrollbarWidth();
-    window.addEventListener("resize", updateScrollbarWidth);
-    return () => window.removeEventListener("resize", updateScrollbarWidth);
-  }, [isMobile]);
-
-  const handlePcBodyScroll = (e) => {
-    const target = e.currentTarget;
-    if (leftBodyRef.current) {
-      leftBodyRef.current.scrollTop = target.scrollTop;
-    }
-    if (rightHeaderRef.current) {
-      rightHeaderRef.current.scrollLeft = target.scrollLeft;
-    }
-  };
-
   const handlePcPanStart = (e) => {
-    if (e.button !== 0 || !rightBodyRef.current) {
+    if (e.button !== 0 || e.target === e.currentTarget || !rightBodyRef.current) {
       return;
     }
 
@@ -101,9 +65,7 @@ export default function RuleOrg() {
     dragStateRef.current = {
       active: true,
       pointerId: e.pointerId,
-      startX: e.clientX,
       startY: e.clientY,
-      startScrollLeft: pane.scrollLeft,
       startScrollTop: pane.scrollTop,
     };
     setIsDraggingPcTable(true);
@@ -119,9 +81,7 @@ export default function RuleOrg() {
     }
 
     const pane = rightBodyRef.current;
-    const dx = e.clientX - dragStateRef.current.startX;
     const dy = e.clientY - dragStateRef.current.startY;
-    pane.scrollLeft = dragStateRef.current.startScrollLeft - dx;
     pane.scrollTop = dragStateRef.current.startScrollTop - dy;
   };
 
@@ -149,7 +109,7 @@ export default function RuleOrg() {
         </div>
       </section>
 
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: 24 }}>
+      <div className={styles.ruleContent}>
         {isMobile ? (
           <>
             <nav className="p-gamesSchedule2__tab" style={{ margin: "0 0 16px", paddingTop: 0, paddingBottom: 0 }}>
@@ -202,15 +162,15 @@ export default function RuleOrg() {
               </ul>
             </nav>
             <div style={{ border: "none", borderRadius: 0, padding: 0, minHeight: 200, overflowX: "auto", marginTop: 16 }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: 'fixed' }}>
+                  <table className={styles.mobileComparison} style={{ width: "100%", borderCollapse: "collapse", tableLayout: 'fixed' }}>
                 <thead>
                   <tr>
                     <th style={{
                       padding: '6px 4px',
-                      borderBottom: '2px solid #f08300',
-                      borderRight: '2px solid #f08300',
-                      borderTop: 'none',
-                      borderLeft: 'none',
+
+
+
+
                           width: '50%',
                       textAlign: 'center',
                       whiteSpace: 'nowrap',
@@ -221,10 +181,10 @@ export default function RuleOrg() {
                     }}>ルール項目</th>
                     <th style={{
                       padding: '6px 4px',
-                      borderBottom: '2px solid #f08300',
-                      borderRight: 'none',
-                      borderTop: 'none',
-                      borderLeft: 'none',
+
+
+
+
                       background: '#fff',
                       color: '#f08300',
                       fontWeight: 'bold',
@@ -236,13 +196,13 @@ export default function RuleOrg() {
                 </thead>
                 <tbody>
                   {RULES.map(rule => (
-                    <tr key={rule.key} style={{ borderBottom: '2px solid transparent' }}>
+                    <tr key={rule.key}>
                       <td style={{
                         padding: '6px 4px',
-                        borderRight: '2px solid #f08300',
-                        borderBottom: 'none',
-                        borderTop: 'none',
-                        borderLeft: 'none',
+
+
+
+
                             width: '50%',
                         textAlign: 'center',
                         whiteSpace: 'pre-line',
@@ -254,7 +214,7 @@ export default function RuleOrg() {
                       }}>{rule.label}</td>
                       <td style={{
                         padding: '6px 4px',
-                        border: 'none',
+
                         textAlign: 'center',
                         background: '#fff',
                         whiteSpace: 'pre-line',
@@ -267,147 +227,43 @@ export default function RuleOrg() {
             </div>
           </>
         ) : (
-          <div style={{ maxWidth: '100%', border: 'none', borderRadius: 8, padding: 0, minHeight: 200, height: 560 }}>
-            <div style={{ display: 'flex', width: '100%' }}>
-              <div
-                style={{
-                  width: 260,
-                  minWidth: 260,
-                  padding: 8,
-                  borderBottom: '2px solid #f08300',
-                  borderRight: '2px solid #f08300',
-                  background: '#fff',
-                  color: '#f08300',
-                  fontWeight: 'bold',
-                  fontSize: 16,
-                  textAlign: 'center',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                ルール項目
-              </div>
-
-              <div
-                ref={rightHeaderRef}
-                style={{
-                  flex: 1,
-                  overflowX: 'hidden',
-                  overflowY: 'hidden',
-                  paddingRight: pcBodyScrollbarWidth,
-                  boxSizing: 'border-box',
-                }}
-              >
-                <table style={{ borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: 180 * GROUPS.length }}>
-                  <thead>
-                    <tr>
-                      {GROUPS.map((g) => (
-                        <th
-                          key={g.key}
-                          style={{
-                            padding: 8,
-                            borderBottom: '2px solid #f08300',
-                            borderRight: 'none',
-                            borderTop: 'none',
-                            borderLeft: 'none',
-                            background: '#fff',
-                            color: '#f08300',
-                            fontWeight: 'bold',
-                            fontSize: 16,
-                            width: 180,
-                            whiteSpace: 'nowrap',
-                          }}
-                          title={g.full}
-                        >
-                          {g.label}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                </table>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', width: '100%', height: 'calc(100% - 42px)' }}>
-              <div
-                ref={leftBodyRef}
-                style={{
-                  width: 260,
-                  minWidth: 260,
-                  overflow: 'hidden',
-                  borderRight: '2px solid #f08300',
-                  height: pcBodyScrollbarHeight > 0 ? `calc(100% - ${pcBodyScrollbarHeight}px)` : '100%',
-                }}
-              >
-                <table style={{ borderCollapse: 'collapse', tableLayout: 'fixed', width: 260 }}>
-                  <tbody>
-                    {RULES.map((rule) => (
-                      <tr key={rule.key} style={{ borderBottom: '2px solid transparent' }}>
-                        <td
-                          style={{
-                            padding: 8,
-                            borderRight: 'none',
-                            borderBottom: 'none',
-                            borderTop: 'none',
-                            borderLeft: 'none',
-                            width: 260,
-                            textAlign: 'center',
-                            whiteSpace: 'nowrap',
-                            background: '#fff',
-                            fontWeight: 'bold',
-                          }}
-                        >
-                          {rule.label}
-                        </td>
-                      </tr>
+          <div
+            ref={rightBodyRef}
+            className={styles.scrollPane}
+            role="region"
+            aria-label="団体別ルール比較表"
+            tabIndex={0}
+            onPointerDown={handlePcPanStart}
+            onPointerMove={handlePcPanMove}
+            onPointerUp={handlePcPanEnd}
+            onPointerCancel={handlePcPanEnd}
+            style={{ cursor: isDraggingPcTable ? "grabbing" : "grab" }}
+          >
+            <table className={styles.comparison}>
+              <thead>
+                <tr>
+                  <th scope="col">ルール項目</th>
+                  {GROUPS.map(group => (
+                    <th key={group.key} scope="col" title={group.full}>{group.label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {RULES.map(rule => (
+                  <tr key={rule.key}>
+                    <th scope="row">{rule.label}</th>
+                    {GROUPS.map(group => (
+                      <td key={group.key}>{renderRuleValue(rule.key, group.key)}</td>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div
-                ref={rightBodyRef}
-                onScroll={handlePcBodyScroll}
-                onPointerDown={handlePcPanStart}
-                onPointerMove={handlePcPanMove}
-                onPointerUp={handlePcPanEnd}
-                onPointerCancel={handlePcPanEnd}
-                style={{
-                  flex: 1,
-                  overflow: 'auto',
-                  cursor: isDraggingPcTable ? 'grabbing' : 'grab',
-                  userSelect: isDraggingPcTable ? 'none' : 'auto',
-                  touchAction: 'none',
-                }}
-              >
-                <table style={{ borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: 180 * GROUPS.length }}>
-                  <tbody>
-                    {RULES.map((rule) => (
-                      <tr key={rule.key} style={{ borderBottom: '2px solid transparent' }}>
-                        {GROUPS.map((g) => (
-                          <td
-                            key={g.key}
-                            style={{
-                              padding: 8,
-                              border: 'none',
-                              textAlign: 'center',
-                              background: '#fff',
-                              width: 180,
-                              whiteSpace: 'pre-line',
-                            }}
-                          >
-                            {renderRuleValue(rule.key, g.key)}
-                        </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
 
         <section
+          className={styles.groupLinks}
           style={{
             marginTop: 28,
             padding: "20px 16px",

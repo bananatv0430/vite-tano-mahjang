@@ -1,0 +1,79 @@
+.ruleContent {
+  max-width: 1800px;
+  margin: 0 auto;
+  padding: 24px clamp(12px, 2vw, 24px);
+}
+
+.groupLinks {
+  max-width: 852px;
+  margin-inline: auto;
+}
+
+.scrollPane {
+  max-width: 100%;
+  max-height: 560px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  touch-action: none;
+}
+
+.comparison {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.comparison th,
+.comparison td {
+  padding: 8px clamp(3px, 0.5vw, 8px);
+  text-align: center;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  background: #fff;
+}
+
+.comparison thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  color: #f08300;
+  font-size: 16px;
+}
+
+.comparison thead th:first-child {
+  width: clamp(90px, 15%, 240px);
+}
+
+@media (max-width: 600px) {
+  .ruleContent {
+    padding-inline: 24px;
+  }
+}
+
+.comparison :is(th, td),
+.mobileComparison :is(th, td) {
+  border: 0;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.comparison thead th,
+.mobileComparison thead th {
+  border-bottom: 2px solid #f08300;
+}
+
+.comparison tr > th:first-child,
+.mobileComparison tr > :first-child {
+  border-right: 2px solid #f08300;
+}
+
+.ruleSegment {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.ruleMarker {
+  color: #d32f2f;
+  font-weight: bold;
+}
